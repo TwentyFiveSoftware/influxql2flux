@@ -81,7 +81,7 @@ const transpileSelectStatement = (influxQL: string): string => {
         fluxQuery.bucket = database + (retention ? `/${retention}` : '');
 
     if (measurement)
-        fluxQuery.filters.push({ field: '_measurement', operator: '==', value: `'${measurement}'` });
+        fluxQuery.filters.push({ field: '_measurement', operator: '==', value: `"${measurement}"` });
 
 
     // WHERE
@@ -102,13 +102,13 @@ const transpileSelectStatement = (influxQL: string): string => {
                     return null;
 
                 if (field.includes(' '))
-                    field = `'${field}'`;
+                    field = `"${field}"`;
 
                 if (operator === ')')
                     operator = '==';
 
                 if (operator !== '=~' && operator !== '!~' && !value.includes('now()') && field !== 'time')
-                    value = `'${value}'`;
+                    value = `"${value}"`;
 
                 if (value.includes('now()'))
                     value = value.replace('now()', '').trim();
@@ -146,7 +146,7 @@ const transpileSelectStatement = (influxQL: string): string => {
                 .filter(column => !column.startsWith('time('))
                 .map(column => {
                     const [, c] = column.match(/^["']?([^"']+)["']?$/) ?? ['', ''];
-                    return `'${c}'`;
+                    return `"${c}"`;
                 });
 
             if (columns.length > 0)
@@ -166,7 +166,7 @@ const transpileSelectStatement = (influxQL: string): string => {
         .split(',')
         .map(a => {
             const [, fn, field] = a.trim().match(/^([a-z_]*)\(["']?([^"']*)["']?\)(?: *as +[a-z]+)?$/i) ?? ['', '', ''];
-            return ({ fn: fn.toLowerCase(), field: `'${field}'` });
+            return ({ fn: fn.toLowerCase(), field: `"${field}"` });
         })
         .filter(a => a.fn !== '');
 
@@ -219,6 +219,6 @@ const generateFluxStatement = (query: FluxSelectQuery): string => {
 
     return `
         from(bucket: "${query.bucket}")
-        ${pipeline.map(step => `    |> ${step}`).join('\n')}
+        ${pipeline.map(step => `\t|> ${step}`).join('\n')}
     `;
 };
