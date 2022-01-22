@@ -33,10 +33,33 @@ interface FluxSelectQuery {
 const transpileSelectStatement = (influxQL: string): string => {
     influxQL = influxQL.replace(/\r|\n|\r\n/g, ' ').replace(/  +/g, ' ').trim();
 
-    const SELECT_REGEX = /^SELECT (.*) FROM (.*) WHERE (.*) GROUP BY (.*) FILL\((.*)\)$/i;
-    // const SELECT_REGEX = /^SELECT (.*) FROM (.*) WHERE (.*)$/i;
+    let statement: { [clause: string]: string, aggregation: string, from: string, where: string, group: string, fill: string } = {
+        aggregation: '', from: '', where: '', group: '', fill: '',
+    };
 
-    let [, aggregation, from, where, group, fill] = influxQL.match(SELECT_REGEX) ?? ['', '', '', '', '', ''];
+    const ranges: { clause: string, from: number, to: number }[] = [];
+    const clauses: { statementKey: string, influxQLIdentifier: string, fromOffset: number, toOffset?: number }[] = [
+        { statementKey: 'fill', influxQLIdentifier: 'FILL', fromOffset: 5, toOffset: -1 },
+        { statementKey: 'group', influxQLIdentifier: 'GROUP BY', fromOffset: 9 },
+        { statementKey: 'where', influxQLIdentifier: 'WHERE', fromOffset: 6 },
+        { statementKey: 'from', influxQLIdentifier: 'FROM', fromOffset: 5 },
+        { statementKey: 'aggregation', influxQLIdentifier: 'SELECT', fromOffset: 7 },
+    ];
+
+
+    let endIndex = influxQL.length;
+
+    for (const clause of clauses) {
+        const index = influxQL.toUpperCase().indexOf(clause.influxQLIdentifier);
+        if (index !== -1) {
+            ranges.push({ clause: clause.statementKey, from: index + clause.fromOffset, to: endIndex + (clause.toOffset ?? 0) });
+            endIndex = index;
+        }
+    }
+
+    for (const range of ranges) {
+        statement[range.clause] = influxQL.substring(range.from, range.to).trim();
+    }
 
 
     const fluxQuery: FluxSelectQuery = {
@@ -48,7 +71,12 @@ const transpileSelectStatement = (influxQL: string): string => {
 
 
     // FROM
-    const [, database, retention, measurement] = from.match(/^["']([^"']+)["'](?:\.["']([^"']+)["'])?(?:\.["']([^"']+)["'])?$/) ?? [];
+    if (statement.from.toLowerCase().includes(' where'))
+        statement.from = statement.from.substring(0, statement.from.toLowerCase().indexOf(' where'));
+
+    const [, database, retention, measurement] = statement.from
+        .match(/^["']([^"']+)["']\.?(?:["']([^"']+)["'])?(?:\.["']([^"']+)["'])?$/) ?? [];
+
     if (database)
         fluxQuery.bucket = database + (retention ? `/${retention}` : '');
 
@@ -57,13 +85,13 @@ const transpileSelectStatement = (influxQL: string): string => {
 
 
     // WHERE
-    if (where.includes('$timeFilter'))
+    if (statement.where.includes('$timeFilter'))
         fluxQuery.range = {
             start: 'v.timeRangeStart',
             stop: 'v.timeRangeStop',
         };
 
-    (where.startsWith('(') ? where.substring(1, where.length - 1) : where)
+    (statement.where.startsWith('(') ? statement.where.substring(1, statement.where.length - 1) : statement.where)
         .split(/ AND /i)
         .map(condition => {
                 let [, field, operator, value] = (condition.trim()
@@ -105,14 +133,14 @@ const transpileSelectStatement = (influxQL: string): string => {
 
 
     // GROUP
-    group = group.trim();
+    statement.group = statement.group.trim();
 
-    if (group.length > 0) {
-        if (group === '*')
+    if (statement.group.length > 0) {
+        if (statement.group === '*')
             fluxQuery.group = { columns: [] };
 
         else {
-            const columns = group
+            const columns = statement.group
                 .split(',')
                 .map(column => column.trim())
                 .filter(column => !column.startsWith('time('))
@@ -126,7 +154,7 @@ const transpileSelectStatement = (influxQL: string): string => {
         }
     }
 
-    const timeAggregation = group.match(/time\(([0-9a-z]+)\)/i);
+    const timeAggregation = statement.group.match(/time\(([0-9a-z]+)\)/i);
     if (timeAggregation)
         fluxQuery.aggregateWindow = {
             every: timeAggregation[1],
@@ -134,7 +162,7 @@ const transpileSelectStatement = (influxQL: string): string => {
 
 
     // AGGREGATION
-    const aggregations = aggregation
+    const aggregations = statement.aggregation
         .split(',')
         .map(a => {
             const [, fn, field] = a.trim().match(/^([a-z_]*)\(["']?([^"']*)["']?\)(?: *as +[a-z]+)?$/i) ?? ['', '', ''];
@@ -152,11 +180,11 @@ const transpileSelectStatement = (influxQL: string): string => {
 
 
     // FILL
-    if (fill.length > 0)
-        if (fill.trim().toLowerCase() === 'previous')
+    if (statement.fill.length > 0)
+        if (statement.fill.trim().toLowerCase() === 'previous')
             fluxQuery.fill = { previous: true, value: '' };
         else
-            fluxQuery.fill = { previous: false, value: fill.trim() };
+            fluxQuery.fill = { previous: false, value: statement.fill.trim() };
 
 
     return generateFluxStatement(fluxQuery);
