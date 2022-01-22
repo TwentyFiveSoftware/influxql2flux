@@ -1,0 +1,18 @@
+.code {
+    display: block;
+    width: 100%;
+    cursor: text;
+    background: var(--color-foreground);
+    color: var(--color-text);
+    padding: 3rem;
+    font-size: 1.8rem;
+    border-radius: 0.4rem;
+}
+
+.token {
+    display: inline-block;
+    overflow: hidden;
+    font-family: 'JetBrains Mono', 'Rubik', sans-serif;
+    line-height: 1.2;
+    font-variant-ligatures: no-contextual;
+}

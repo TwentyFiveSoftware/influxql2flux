@@ -37,6 +37,10 @@
     padding: 3rem;
     font-size: 1.8rem;
     border-radius: 0.4rem;
+    overflow: hidden;
+    font-family: 'JetBrains Mono', 'Rubik', sans-serif;
+    line-height: 1.2;
+    font-variant-ligatures: no-contextual;
 
     &:focus {
         outline: 0.3rem solid var(--color-accent);
@@ -50,13 +54,4 @@
 .outputContainer {
     width: 100%;
     padding: 0.3rem;
-}
-
-.output {
-    width: 100%;
-    background: var(--color-foreground);
-    color: var(--color-text);
-    padding: 3rem;
-    font-size: 1.8rem;
-    border-radius: 0.4rem;
 }

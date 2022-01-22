@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import styles from './styles/App.module.scss';
 import { transpile } from './logic/transpile';
 import TextareaAutosize from 'react-textarea-autosize';
+import SyntaxHighlighting from './components/SyntaxHighlighting';
 
 const App = () => {
     const [influxQL, setInfluxQL] = useState<string>('');
@@ -21,11 +22,7 @@ const App = () => {
 
                 {flux.length > 0 && (
                     <div className={styles.outputContainer}>
-                        <div className={styles.output}>
-                            {flux.split('\n').map((line, index) => (
-                                <p key={index}>{line}</p>
-                            ))}
-                        </div>
+                        <SyntaxHighlighting code={flux} />
                     </div>
                 )}
             </main>
