@@ -26,16 +26,17 @@ interface FluxSelectQuery {
         fn?: string;
     };
     aggregateFunctions: string[];
+    fill?: { previous: boolean, value: string };
 }
 
 
 const transpileSelectStatement = (influxQL: string): string => {
     influxQL = influxQL.replace(/\r|\n|\r\n/g, ' ').replace(/  +/g, ' ').trim();
 
-    const SELECT_REGEX = /^SELECT (.*) FROM (.*) WHERE (.*) GROUP BY (.*)$/i;
+    const SELECT_REGEX = /^SELECT (.*) FROM (.*) WHERE (.*) GROUP BY (.*) FILL\((.*)\)$/i;
     // const SELECT_REGEX = /^SELECT (.*) FROM (.*) WHERE (.*)$/i;
 
-    let [, aggregation, from, where, group] = influxQL.match(SELECT_REGEX) ?? ['', '', '', '', ''];
+    let [, aggregation, from, where, group, fill] = influxQL.match(SELECT_REGEX) ?? ['', '', '', '', '', ''];
 
 
     const fluxQuery: FluxSelectQuery = {
@@ -136,14 +137,27 @@ const transpileSelectStatement = (influxQL: string): string => {
     const aggregations = aggregation
         .split(',')
         .map(a => {
-            const [, fn, field] = a.trim().match(/^([a-z_]*)\(["']?([^"']+)["']?\)(?: *as +[a-z]+)?$/i) ?? ['', '', ''];
-            return ({ fn: fn.toLowerCase(), fieldName: `'${field}'` });
-        });
+            const [, fn, field] = a.trim().match(/^([a-z_]*)\(["']?([^"']*)["']?\)(?: *as +[a-z]+)?$/i) ?? ['', '', ''];
+            return ({ fn: fn.toLowerCase(), field: `'${field}'` });
+        })
+        .filter(a => a.fn !== '');
 
-    if (aggregations.length > 0 && fluxQuery.aggregateWindow)
+    if (aggregations.length > 0 && fluxQuery.aggregateWindow) {
         fluxQuery.aggregateWindow.fn = aggregations[0].fn;
+        fluxQuery.filters.push({ field: '_field', operator: '==', value: aggregations[0].field });
+    }
 
-    fluxQuery.filters.push(...aggregations.map(a => ({ field: '_field', operator: '==', value: a.fieldName })));
+    if (aggregations.length > 1)
+        fluxQuery.aggregateFunctions.push(...aggregations.slice(1).map(a => a.fn));
+
+
+    // FILL
+    if (fill.length > 0)
+        if (fill.trim().toLowerCase() === 'previous')
+            fluxQuery.fill = { previous: true, value: '' };
+        else
+            fluxQuery.fill = { previous: false, value: fill.trim() };
+
 
     return generateFluxStatement(fluxQuery);
 };
@@ -169,6 +183,11 @@ const generateFluxStatement = (query: FluxSelectQuery): string => {
     if (query.aggregateWindow)
         pipeline.push(`aggregateWindow(every: ${query.aggregateWindow.every}${
             query.aggregateWindow.fn ? `, fn: ${query.aggregateWindow.fn}` : ''})`);
+
+    pipeline.push(...query.aggregateFunctions.map(fn => `${fn}()`));
+
+    if (query.fill)
+        pipeline.push(query.fill.previous ? `fill(usePrevious: true)` : `fill(value: ${query.fill.value})`);
 
     return `
         from(bucket: "${query.bucket}")
