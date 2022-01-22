@@ -30,7 +30,7 @@
 
 .input {
     width: 100%;
-    resize: vertical;
+    resize: none;
     border: none;
     background: var(--color-foreground);
     color: var(--color-text);
@@ -55,7 +55,6 @@
 .output {
     width: 100%;
     background: var(--color-foreground);
-    opacity: 0.5;
     color: var(--color-text);
     padding: 3rem;
     font-size: 1.8rem;

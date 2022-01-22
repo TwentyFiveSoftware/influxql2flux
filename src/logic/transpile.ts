@@ -75,7 +75,7 @@ const transpileSelectStatement = (influxQL: string): string => {
         statement.from = statement.from.substring(0, statement.from.toLowerCase().indexOf(' where'));
 
     const [, database, retention, measurement] = statement.from
-        .match(/^["']([^"']+)["']\.?(?:["']([^"']+)["'])?(?:\.["']([^"']+)["'])?$/) ?? [];
+        .match(/^["']?([^"'.]+)["']?\.?(?:["']?([^"'.]+)["']?)?(?:\.["']?([^"'.]+)["']?)?$/) ?? [];
 
     if (database)
         fluxQuery.bucket = database + (retention ? `/${retention}` : '');

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import styles from './styles/App.module.scss';
 import { transpile } from './logic/transpile';
+import TextareaAutosize from 'react-textarea-autosize';
 
 const App = () => {
     const [influxQL, setInfluxQL] = useState<string>('');
@@ -14,8 +15,8 @@ const App = () => {
                 <h1 className={styles.headline}>InfluxQL to Flux transpiler</h1>
 
                 <div className={styles.inputContainer}>
-                    <textarea className={styles.input} rows={1} placeholder={'Type your InfluxQL query here'}
-                              value={influxQL} onChange={e => setInfluxQL(e.target.value)} />
+                    <TextareaAutosize className={styles.input} rows={1} placeholder={'Type your InfluxQL query here'}
+                                      value={influxQL} onChange={e => setInfluxQL(e.target.value)} spellCheck={false} />
                 </div>
 
                 {flux.length > 0 && (
