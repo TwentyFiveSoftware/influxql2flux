@@ -20,7 +20,11 @@ const App = () => {
 
                 {flux.length > 0 && (
                     <div className={styles.outputContainer}>
-                        <p className={styles.output}>{flux}</p>
+                        <div className={styles.output}>
+                            {flux.split('\n').map((line, index) => (
+                                <p key={index}>{line}</p>
+                            ))}
+                        </div>
                     </div>
                 )}
             </main>
