@@ -18,21 +18,31 @@ interface FluxSelectQuery {
         stop?: string;
     };
     filters: { field: string, operator: string, value: string }[];
+    group?: {
+        columns: string[]
+    };
+    aggregateWindow?: {
+        every: string;
+        fn?: string;
+    };
+    aggregateFunctions: string[];
 }
+
 
 const transpileSelectStatement = (influxQL: string): string => {
     influxQL = influxQL.replace(/\r|\n|\r\n/g, ' ').replace(/  +/g, ' ').trim();
 
-    // const SELECT_REGEX = /^SELECT (.*) FROM (.*) WHERE (.*) GROUP BY (.*)$/i;
-    const SELECT_REGEX = /^SELECT (.*) FROM (.*) WHERE (.*)$/i;
+    const SELECT_REGEX = /^SELECT (.*) FROM (.*) WHERE (.*) GROUP BY (.*)$/i;
+    // const SELECT_REGEX = /^SELECT (.*) FROM (.*) WHERE (.*)$/i;
 
-    const [, aggregation, from, where] = influxQL.match(SELECT_REGEX) ?? ['', '', '', ''];
+    let [, aggregation, from, where, group] = influxQL.match(SELECT_REGEX) ?? ['', '', '', '', ''];
 
 
     const fluxQuery: FluxSelectQuery = {
         bucket: '',
         range: {},
         filters: [],
+        aggregateFunctions: [],
     };
 
 
@@ -42,7 +52,7 @@ const transpileSelectStatement = (influxQL: string): string => {
         fluxQuery.bucket = database + (retention ? `/${retention}` : '');
 
     if (measurement)
-        fluxQuery.filters.push({ field: '_measurement', operator: '==', value: measurement });
+        fluxQuery.filters.push({ field: '_measurement', operator: '==', value: `'${measurement}'` });
 
 
     // WHERE
@@ -93,6 +103,48 @@ const transpileSelectStatement = (influxQL: string): string => {
         });
 
 
+    // GROUP
+    group = group.trim();
+
+    if (group.length > 0) {
+        if (group === '*')
+            fluxQuery.group = { columns: [] };
+
+        else {
+            const columns = group
+                .split(',')
+                .map(column => column.trim())
+                .filter(column => !column.startsWith('time('))
+                .map(column => {
+                    const [, c] = column.match(/^["']?([^"']+)["']?$/) ?? ['', ''];
+                    return `'${c}'`;
+                });
+
+            if (columns.length > 0)
+                fluxQuery.group = { columns };
+        }
+    }
+
+    const timeAggregation = group.match(/time\(([0-9a-z]+)\)/i);
+    if (timeAggregation)
+        fluxQuery.aggregateWindow = {
+            every: timeAggregation[1],
+        };
+
+
+    // AGGREGATION
+    const aggregations = aggregation
+        .split(',')
+        .map(a => {
+            const [, fn, field] = a.trim().match(/^([a-z_]*)\(["']?([^"']+)["']?\)(?: *as +[a-z]+)?$/i) ?? ['', '', ''];
+            return ({ fn: fn.toLowerCase(), fieldName: `'${field}'` });
+        });
+
+    if (aggregations.length > 0 && fluxQuery.aggregateWindow)
+        fluxQuery.aggregateWindow.fn = aggregations[0].fn;
+
+    fluxQuery.filters.push(...aggregations.map(a => ({ field: '_field', operator: '==', value: a.fieldName })));
+
     return generateFluxStatement(fluxQuery);
 };
 
@@ -110,6 +162,13 @@ const generateFluxStatement = (query: FluxSelectQuery): string => {
         const field = filter.field.startsWith('\'') ? `r[${filter.field}]` : `r.${filter.field}`;
         return `filter(fn: (r) => ${field} ${filter.operator} ${filter.value})`;
     }));
+
+    if (query.group)
+        pipeline.push(`group(${query.group.columns.length > 0 ? `columns: [${query.group.columns.join(', ')}]` : ''})`);
+
+    if (query.aggregateWindow)
+        pipeline.push(`aggregateWindow(every: ${query.aggregateWindow.every}${
+            query.aggregateWindow.fn ? `, fn: ${query.aggregateWindow.fn}` : ''})`);
 
     return `
         from(bucket: "${query.bucket}")
