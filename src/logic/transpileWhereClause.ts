@@ -14,7 +14,7 @@ interface WhereClause {
     filters?: Condition | Filter;
 }
 
-const REGEX_NUMBER = /^(-?[0-9]+(?:\.?[0-9]+)?)$/;
+const REGEX_NUMBER = /^(-?[0-9]+(?:\.[0-9]+)?)$/;
 const REGEX_TIMESTAMP = /^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)$/;
 const REGEX_COMPARISON_OPERATORS = /<=|>=|<>|!=|=~|!~|<|>|==|=/;
 
