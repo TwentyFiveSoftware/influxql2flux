@@ -1,6 +1,6 @@
 import { removeUnnecessaryOuterBrackets } from './utility/removeUnnecessaryOuterBrackets';
 import { getMostOuterGroups } from './utility/getMostOuterGroups';
-import { REGEX_COMPARISON_OPERATORS, REGEX_NUMBER, REGEX_TIMESTAMP } from './regexs';
+import { REGEX_COMPARISON_OPERATORS, REGEX_FIELD_IN_PATTERN, REGEX_NUMBER, REGEX_TIMESTAMP } from './regexs';
 
 export interface Filter {
     fields: string[];
@@ -51,12 +51,12 @@ const parseFilter = (influxQL: string): Filter => {
 };
 
 const formatFields = (influxQL: string): { fields: string[], fieldsPattern: string } => {
-    const left = influxQL.split(REGEX_COMPARISON_OPERATORS)[0];
+    const left = influxQL.split(REGEX_COMPARISON_OPERATORS)[0].trim();
 
-    let fieldsPattern: string = left.trim();
+    let fieldsPattern: string = left;
 
     const fields: string[] = [];
-    for (const fieldMatch of left.trim().matchAll(/([a-zA-Z_]+)|"([^"]+)"|'([^']+)'/gi)) {
+    for (const fieldMatch of left.matchAll(REGEX_FIELD_IN_PATTERN)) {
         const field: string = fieldMatch[1] ?? fieldMatch[2] ?? fieldMatch[3] ?? fieldMatch[0];
 
         if (field.toLowerCase() === 'true' || field.toLowerCase() === 'false')
@@ -66,7 +66,7 @@ const formatFields = (influxQL: string): { fields: string[], fieldsPattern: stri
         fieldsPattern = fieldsPattern.replace(fieldMatch[0], '$');
     }
 
-    fieldsPattern = fieldsPattern.replace(/  +/g, ' ').trim();
+    fieldsPattern = fieldsPattern.replace(/  +/g, ' ');
     fieldsPattern = removeUnnecessaryOuterBrackets(fieldsPattern);
 
     return { fields, fieldsPattern };

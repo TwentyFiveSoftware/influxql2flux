@@ -1,6 +1,7 @@
 import { removeUnnecessaryOuterBrackets } from './utility/removeUnnecessaryOuterBrackets';
 import { getMostOuterGroups } from './utility/getMostOuterGroups';
-import { REGEX_TIME_INTERVAL } from './regexs';
+import { REGEX_FIELD_IN_PATTERN, REGEX_TIME_INTERVAL } from './regexs';
+import { matchInfluxFunctions } from './utility/matchInfluxFunction';
 
 interface Fn {
     fn: string;
@@ -43,19 +44,17 @@ const parse = (influxQL: string): Expression => {
 };
 
 const parseExpression = (influxQL: string): Expression => {
-    influxQL = removeUnnecessaryOuterBrackets(influxQL.trim());
+    influxQL = removeUnnecessaryOuterBrackets(influxQL);
+
+    const timeIntervalMatch = influxQL.match(REGEX_TIME_INTERVAL);
+    if (timeIntervalMatch && timeIntervalMatch.index === 0 && timeIntervalMatch[0].length === influxQL.length)
+        return { pattern: influxQL, fields: [], functions: [] };
+
 
     let pattern: string = influxQL;
-
-    const timeIntervalMatch = pattern.match(REGEX_TIME_INTERVAL);
-    if (timeIntervalMatch && timeIntervalMatch.index === 0 && timeIntervalMatch[0].length === pattern.length)
-        return { pattern, fields: [], functions: [] };
-
-
     const fields: string[] = [];
 
-    // TODO: move in dedicated method (duplicate code from where clause)
-    for (const fieldMatch of influxQL.trim().matchAll(/([a-zA-Z_]+)|"([^"]+)"|'([^']+)'/gi)) {
+    for (const fieldMatch of influxQL.matchAll(REGEX_FIELD_IN_PATTERN)) {
         const field: string = fieldMatch[1] ?? fieldMatch[2] ?? fieldMatch[3] ?? fieldMatch[0];
 
         if (field.toLowerCase() === 'true' || field.toLowerCase() === 'false')
@@ -65,51 +64,25 @@ const parseExpression = (influxQL: string): Expression => {
         pattern = pattern.replace(fieldMatch[0], '$');
     }
 
-    pattern = pattern.replace(/  +/g, ' ').replaceAll('($)', '$').trim();
-    pattern = removeUnnecessaryOuterBrackets(pattern).trim();
+    pattern = pattern.replace(/  +/g, ' ').replaceAll('($)', '$');
+    pattern = removeUnnecessaryOuterBrackets(pattern);
 
     return { pattern, fields, functions: [] };
 };
 
 const parseFunctions = (influxQL: string): { functions: Fn[], fnPattern: string } => {
-    influxQL = removeUnnecessaryOuterBrackets(influxQL);
+    const functions = matchInfluxFunctions(influxQL)
+        .sort((a, b) => a.fromIndex - b.fromIndex);
 
-    const functions: Fn[] = [];
+    let fnPattern = '';
+    let currIndex = 0;
 
-    while (true) {
-        const fnMatch = influxQL.match(/[a-z0-9_]+ *\(/i);
-        if (!fnMatch)
-            break;
-
-
-        const fnStartIndex = fnMatch.index ?? 0;
-        let fnEndIndex = -1;
-
-        let bracketStack = 0;
-        for (let i = fnStartIndex; i < influxQL.length; i++) {
-            if (influxQL.charAt(i) === '(')
-                bracketStack++;
-            else if (influxQL.charAt(i) === ')') {
-                if (bracketStack === 1) {
-                    fnEndIndex = i;
-                    break;
-                }
-
-                bracketStack--;
-            }
-        }
-
-        if (fnEndIndex === -1)
-            break;
-
-        const fn = influxQL.substring(fnStartIndex, fnEndIndex);
-        const fnName = fn.split('(', 1)[0].trim().toLowerCase();
-        const fnArguments = removeUnnecessaryOuterBrackets(fn.substring(fn.indexOf('(') + 1).trim()).split(',');
-
-        functions.push({ fn: fnName, arguments: fnArguments.map(parse) });
-
-        influxQL = influxQL.substring(0, fnStartIndex) + '#' + influxQL.substring(fnEndIndex + 1);
+    for (const fn of functions) {
+        fnPattern += influxQL.substring(currIndex, fn.fromIndex) + '#';
+        currIndex = fn.toIndex + 1;
     }
 
-    return { functions, fnPattern: influxQL };
+    fnPattern += influxQL.substring(currIndex);
+
+    return { functions: functions.map(fn => ({ fn: fn.fn, arguments: fn.arguments.map(parse) })), fnPattern };
 };
