@@ -4,8 +4,6 @@ interface GroupByClause {
     timeInterval?: string;
 }
 
-const REGEX_TIME_INTERVAL = /(-?[0-9]+(?:\.[0-9]+)?(?:y|mo|w|d|h|m|s|ms|us|µs|ns)?)/i;
-
 export const transpileGroupByClause = (influxQL: string): GroupByClause => {
     const groupByClause: GroupByClause = {
         columns: [],
@@ -26,7 +24,7 @@ export const transpileGroupByClause = (influxQL: string): GroupByClause => {
     if (timeGrouping) {
         columns = columns.filter(c => c !== timeGrouping[0]);
 
-        const interval = timeGrouping[0].match(REGEX_TIME_INTERVAL);
+        const interval = timeGrouping[0].match(/(-?[0-9]+(?:\.[0-9]+)?(?:y|mo|w|d|h|m|s|ms|us|µs|ns)?)/i);
         groupByClause.timeInterval = interval ? interval[1] : '';
     }
 

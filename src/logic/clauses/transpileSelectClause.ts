@@ -1,4 +1,6 @@
-import { getMostOuterGroups, removeUnnecessaryOuterBrackets } from './transpileWhereClause';
+import { removeUnnecessaryOuterBrackets } from './utility/removeUnnecessaryOuterBrackets';
+import { getMostOuterGroups } from './utility/getMostOuterGroups';
+import { REGEX_TIME_INTERVAL } from './regexs';
 
 interface Fn {
     fn: string;
@@ -16,20 +18,19 @@ interface SelectClause {
     expressions: Expression[];
 }
 
-const REGEX_TIME_INTERVAL = /^-?[0-9]+(?:\.[0-9]+)?(?:y|mo|w|d|h|m|s|ms|us|µs|ns)$/i;
-
 export const transpileSelectClause = (influxQL: string): SelectClause => {
     const selectClause: SelectClause = {
         star: false,
         expressions: [],
     };
 
-    const expressions: string[] = getMostOuterGroups(influxQL, ',').filter(e => e.trim().length > 0);
+    const groups: string[] = getMostOuterGroups(influxQL, ',')
+        .map(e => e.trim()).filter(e => e.length > 0);
 
-    if (expressions.length === 0 || expressions.some(e => e.trim() === '*'))
+    if (groups.length === 0 || groups.includes('*'))
         selectClause.star = true;
     else
-        selectClause.expressions = expressions.map(parse);
+        selectClause.expressions = groups.map(parse);
 
     return selectClause;
 };

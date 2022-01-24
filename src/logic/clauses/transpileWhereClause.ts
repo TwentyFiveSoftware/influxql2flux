@@ -1,3 +1,7 @@
+import { removeUnnecessaryOuterBrackets } from './utility/removeUnnecessaryOuterBrackets';
+import { getMostOuterGroups } from './utility/getMostOuterGroups';
+import { REGEX_COMPARISON_OPERATORS, REGEX_NUMBER, REGEX_TIMESTAMP } from './regexs';
+
 export interface Filter {
     fields: string[];
     fieldsPattern?: string;
@@ -13,10 +17,6 @@ export interface Condition {
 interface WhereClause {
     filters?: Condition | Filter;
 }
-
-const REGEX_NUMBER = /^(-?[0-9]+(?:\.[0-9]+)?)$/;
-const REGEX_TIMESTAMP = /^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)$/;
-const REGEX_COMPARISON_OPERATORS = /<=|>=|<>|!=|=~|!~|<|>|==|=/;
 
 export const transpileWhereClause = (influxQL: string): WhereClause => {
     if (influxQL.trim().length === 0)
@@ -67,7 +67,7 @@ const formatFields = (influxQL: string): { fields: string[], fieldsPattern: stri
     }
 
     fieldsPattern = fieldsPattern.replace(/  +/g, ' ').trim();
-    fieldsPattern = removeUnnecessaryOuterBrackets(fieldsPattern).trim();
+    fieldsPattern = removeUnnecessaryOuterBrackets(fieldsPattern);
 
     return { fields, fieldsPattern };
 };
@@ -105,50 +105,4 @@ const formatValue = (influxQL: string, operator: string): string => {
         value = `"${value}"`;
 
     return value;
-};
-
-export const getMostOuterGroups = (influxQL: string, connective: string): string[] => {
-    const groups: string[] = [];
-
-    let currentGroupStartIndex = 0;
-    let bracketStack = 0;
-    for (let i = 0; i < influxQL.length; i++) {
-        if (influxQL.charAt(i) === '(')
-            bracketStack++;
-        else if (influxQL.charAt(i) === ')')
-            bracketStack--;
-
-        if (bracketStack === 0 && influxQL.substring(i).match(new RegExp(`^${connective}`, 'i'))) {
-            groups.push(influxQL.substring(currentGroupStartIndex, i));
-            currentGroupStartIndex = i + connective.length;
-        }
-    }
-
-    groups.push(influxQL.substring(currentGroupStartIndex));
-
-    return groups;
-};
-
-export const removeUnnecessaryOuterBrackets = (influxQL: string): string => {
-    while (influxQL.startsWith('(') && influxQL.endsWith(')')) {
-        const newInfluxQL = influxQL.trim().substring(1, influxQL.length - 1).trim();
-
-        let bracketStack = 0;
-        for (let i = 0; i < newInfluxQL.length; i++) {
-            if (newInfluxQL.charAt(i) === '(')
-                bracketStack++;
-            else if (newInfluxQL.charAt(i) === ')')
-                bracketStack--;
-
-            if (bracketStack < 0)
-                break;
-        }
-
-        if (bracketStack < 0)
-            break;
-
-        influxQL = newInfluxQL;
-    }
-
-    return influxQL;
 };
