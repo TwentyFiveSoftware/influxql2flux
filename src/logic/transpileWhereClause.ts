@@ -28,11 +28,11 @@ export const transpileWhereClause = (influxQL: string): WhereClause => {
 const parse = (influxQL: string): Condition | Filter => {
     influxQL = removeUnnecessaryOuterBrackets(influxQL);
 
-    const orGroups = getMostOuterGroups(influxQL, 'or');
+    const orGroups = getMostOuterGroups(influxQL, ' or ');
     if (orGroups.length > 1)
         return { type: 'or', variables: orGroups.map(parse) } as Condition;
 
-    const andGroups = getMostOuterGroups(influxQL, 'and');
+    const andGroups = getMostOuterGroups(influxQL, ' and ');
     if (andGroups.length > 1)
         return { type: 'and', variables: andGroups.map(parse) } as Condition;
 
@@ -67,7 +67,7 @@ const formatFields = (influxQL: string): { fields: string[], fieldsPattern: stri
     }
 
     fieldsPattern = fieldsPattern.replace(/  +/g, ' ').trim();
-    fieldsPattern = removeUnnecessaryOuterBrackets(fieldsPattern);
+    fieldsPattern = removeUnnecessaryOuterBrackets(fieldsPattern).trim();
 
     return { fields, fieldsPattern };
 };
@@ -107,7 +107,7 @@ const formatValue = (influxQL: string, operator: string): string => {
     return value;
 };
 
-const getMostOuterGroups = (influxQL: string, connective: 'and' | 'or'): string[] => {
+export const getMostOuterGroups = (influxQL: string, connective: string): string[] => {
     const groups: string[] = [];
 
     let currentGroupStartIndex = 0;
@@ -118,9 +118,9 @@ const getMostOuterGroups = (influxQL: string, connective: 'and' | 'or'): string[
         else if (influxQL.charAt(i) === ')')
             bracketStack--;
 
-        if (bracketStack === 0 && influxQL.substring(i).match(new RegExp(`^ ${connective} `, 'i'))) {
+        if (bracketStack === 0 && influxQL.substring(i).match(new RegExp(`^${connective}`, 'i'))) {
             groups.push(influxQL.substring(currentGroupStartIndex, i));
-            currentGroupStartIndex = i + ` ${connective} `.length;
+            currentGroupStartIndex = i + connective.length;
         }
     }
 
@@ -129,7 +129,7 @@ const getMostOuterGroups = (influxQL: string, connective: 'and' | 'or'): string[
     return groups;
 };
 
-const removeUnnecessaryOuterBrackets = (influxQL: string): string => {
+export const removeUnnecessaryOuterBrackets = (influxQL: string): string => {
     while (influxQL.startsWith('(') && influxQL.endsWith(')')) {
         const newInfluxQL = influxQL.trim().substring(1, influxQL.length - 1).trim();
 
