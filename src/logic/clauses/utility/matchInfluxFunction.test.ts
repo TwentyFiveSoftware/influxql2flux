@@ -4,6 +4,7 @@ test.each([
     ['', []],
     ['count("field")', [{ fn: 'count', arguments: ['"field"'], fromIndex: 0, toIndex: 13 }]],
     [' fill(-3.9)  ', [{ fn: 'fill', arguments: ['-3.9'], fromIndex: 1, toIndex: 10 }]],
+    ['fill()', [{ fn: 'fill', arguments: [], fromIndex: 0, toIndex: 5 }]],
     ['  fill(( (previous)))', [{ fn: 'fill', arguments: ['previous'], fromIndex: 2, toIndex: 20 }]],
     ['(derivative("field", 2.5s))', [{ fn: 'derivative', arguments: ['"field"', '2.5s'], fromIndex: 1, toIndex: 25 }]],
 

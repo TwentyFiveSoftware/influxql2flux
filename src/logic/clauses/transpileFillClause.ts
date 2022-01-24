@@ -1,3 +1,6 @@
+import { matchInfluxFunctions } from './utility/matchInfluxFunction';
+import { REGEX_NUMBER } from './regexs';
+
 interface FillClause {
     usePrevious: boolean;
     value: string;
@@ -9,11 +12,18 @@ export const transpileFillClause = (influxQL: string): FillClause => {
         value: '',
     };
 
-    const fillPreviousMatch = influxQL.trim().match(/^fill\( *previous *\)$/i);
+    const fn = matchInfluxFunctions(influxQL);
+
+    const fillFn = fn.find(fn => fn.fn === 'fill' && fn.arguments.length === 1);
+    if (!fillFn)
+        return fillClause;
+
+
+    const fillPreviousMatch = fillFn.arguments[0].toLowerCase().includes('previous');
     if (fillPreviousMatch)
         fillClause.usePrevious = true;
 
-    const fillNumberMatch = influxQL.trim().match(/^fill\( *(-?[0-9]+(?:\.[0-9]+)?) *\)$/i);
+    const fillNumberMatch = fillFn.arguments[0].toLowerCase().match(REGEX_NUMBER);
     if (fillNumberMatch)
         fillClause.value = fillNumberMatch[1] ?? '';
 

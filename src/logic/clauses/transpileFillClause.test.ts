@@ -13,7 +13,7 @@ test('previous', () => {
 });
 
 test('value 1', () => {
-    const fillClause = transpileFillClause(`fill(12)`);
+    const fillClause = transpileFillClause(` a(1), fill(12)`);
     expect(fillClause.usePrevious).toBe(false);
     expect(fillClause.value).toEqual('12');
 });
@@ -37,7 +37,7 @@ test('linear', () => {
 });
 
 test('none', () => {
-    const fillClause = transpileFillClause(`fill(none)`);
+    const fillClause = transpileFillClause(`fill( (none))`);
     expect(fillClause.usePrevious).toBe(false);
     expect(fillClause.value).toEqual('');
 });
@@ -50,6 +50,12 @@ test('invalid 1', () => {
 
 test('invalid 2', () => {
     const fillClause = transpileFillClause(`xxxxx(12)`);
+    expect(fillClause.usePrevious).toBe(false);
+    expect(fillClause.value).toEqual('');
+});
+
+test('invalid 3', () => {
+    const fillClause = transpileFillClause(`fill(2s)`);
     expect(fillClause.usePrevious).toBe(false);
     expect(fillClause.value).toEqual('');
 });

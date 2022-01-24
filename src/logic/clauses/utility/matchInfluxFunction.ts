@@ -39,7 +39,8 @@ export const matchInfluxFunctions = (influxQL: string): InfluxFunction[] => {
         const fnName = fn.split('(', 1)[0].trim().toLowerCase();
         const fnArguments = removeUnnecessaryOuterBrackets(fn.substring(fn.indexOf('(') + 1).trim())
             .split(',')
-            .map(a => removeUnnecessaryOuterBrackets(a));
+            .map(a => removeUnnecessaryOuterBrackets(a))
+            .filter(a => a.length > 0);
 
         functions.push({ fn: fnName, arguments: fnArguments, fromIndex: fnStartIndex, toIndex: fnEndIndex });
 
