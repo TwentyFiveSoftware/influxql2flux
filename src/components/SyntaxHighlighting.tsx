@@ -5,11 +5,9 @@ interface Props {
     code: string;
 }
 
-//select mean(x) from test where $timeFilter and x = Y group by time(1s), a,b,c fill(0.0)
-
 const SyntaxHighlighting = ({ code }: Props) => {
     const lines = code.split('\n')
-        .map(line => line.replace(/ +/g, '\t'))
+        .map(line => line.replace(/ /g, '\t'))
         .filter(line => line.trim().length > 0)
         .map(line => {
             const tokens: { color: string, text: string, index: number }[] = [];
@@ -33,9 +31,8 @@ const SyntaxHighlighting = ({ code }: Props) => {
             for (const fn of line.matchAll(/(-?[0-9]+(?:\.[0-9]*)?(?:y|mo|w|d|h|m|s|ms|us|µs|ns)?)/gi))
                 tokens.push({ color: '#D19A66', text: fn[1] ?? '', index: fn.index ?? 0 });
 
-            for (const fn of line.matchAll(/\t/gi))
-                if (!tokens.some(t => t.index <= (fn.index ?? 0) && t.index + t.text.length >= (fn.index ?? 0)))
-                    tokens.push({ color: '', text: '\t', index: fn.index ?? 0 });
+            for (const fn of line.matchAll(/\t/g))
+                tokens.push({ color: '', text: '\t', index: fn.index ?? 0 });
 
 
             const sortedTokens = tokens.sort((a, b) => a.index - b.index);
