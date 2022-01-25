@@ -1,3 +1,11 @@
+export interface Clauses {
+    select?: SelectClause.Clause;
+    from?: FromClause.Clause;
+    where?: WhereClause.Clause;
+    groupBy?: GroupByClause.Clause;
+    fill?: FillClause.Clause;
+}
+
 export namespace SelectClause {
     export interface Clause {
         star: boolean;

@@ -6,20 +6,21 @@ export const parseFromClause = (influxQL: string): FromClause.Clause => {
     };
 
     influxQL = influxQL
+        .trim()
         .split('.')
         .map(c => (c.length === 0 || c.match(/^["']([^"'.]+)["']$/)) ? c : `"${c}"`)
         .join('.');
 
-    const [, database, retention, measurement] = influxQL
-        .match(/^["']([^"'.]+)["']\.?(?:["']([^"'.]+)["'])?(?:\.["']([^"'.]+)["'])?$/) ?? [];
+    const [, database, retention, measurement] = influxQL.match(
+        /^["']([^"'.]+)["']\.?(?:["']([^"'.]+)["'])?(?:\.["']([^"'.]+)["'])?$/) ?? [null, null, null, null];
 
-    if (database)
+    if (database !== null)
         fromClause.bucket = database;
 
-    if (database && retention)
+    if (database !== null && retention !== null)
         fromClause.retention = retention;
 
-    if (database && measurement)
+    if (database !== null && measurement !== null)
         fromClause.measurement = measurement;
 
     return fromClause;
