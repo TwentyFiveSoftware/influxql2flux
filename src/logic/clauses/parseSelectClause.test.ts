@@ -1,20 +1,21 @@
-import { Expression, transpileSelectClause } from './transpileSelectClause';
+import { parseSelectClause } from './parseSelectClause';
+import type { SelectClause } from './types';
 
 test('empty', () => {
-    const selectClause = transpileSelectClause(``);
+    const selectClause = parseSelectClause(``);
     expect(selectClause.star).toBe(true);
     expect(selectClause.expressions).toEqual([]);
 });
 
 test('star', () => {
-    const selectClause = transpileSelectClause(`*`);
+    const selectClause = parseSelectClause(`*`);
     expect(selectClause.star).toBe(true);
     expect(selectClause.expressions).toEqual([]);
 });
 
 test('one field', () => {
-    const selectClause = transpileSelectClause(`"total_memory"`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`"total_memory"`);
+    const expressions: SelectClause.Expression[] = [
         { pattern: '$', fields: ['"total_memory"'], functions: [] },
     ];
     expect(selectClause.star).toBe(false);
@@ -22,8 +23,8 @@ test('one field', () => {
 });
 
 test('two fields', () => {
-    const selectClause = transpileSelectClause(`"total_memory", 'cpu usage'`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`"total_memory", 'cpu usage'`);
+    const expressions: SelectClause.Expression[] = [
         { pattern: '$', fields: ['"total_memory"'], functions: [] },
         { pattern: '$', fields: ['"cpu usage"'], functions: [] },
     ];
@@ -32,8 +33,8 @@ test('two fields', () => {
 });
 
 test('three fields', () => {
-    const selectClause = transpileSelectClause(`"total_memory", disk, 'cpu usage'`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`"total_memory", disk, 'cpu usage'`);
+    const expressions: SelectClause.Expression[] = [
         { pattern: '$', fields: ['"total_memory"'], functions: [] },
         { pattern: '$', fields: ['"disk"'], functions: [] },
         { pattern: '$', fields: ['"cpu usage"'], functions: [] },
@@ -43,8 +44,8 @@ test('three fields', () => {
 });
 
 test('bottom', () => {
-    const selectClause = transpileSelectClause(`bottom("water level", 7)`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`bottom("water level", 7)`);
+    const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
                 fn: 'bottom', arguments: [
@@ -59,8 +60,8 @@ test('bottom', () => {
 });
 
 test('top', () => {
-    const selectClause = transpileSelectClause(`max("request" ,  20  )`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`max("request" ,  20  )`);
+    const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
                 fn: 'max', arguments: [
@@ -75,8 +76,8 @@ test('top', () => {
 });
 
 test('count + distinct', () => {
-    const selectClause = transpileSelectClause(`count(distinct(cpu_usage))`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`count(distinct(cpu_usage))`);
+    const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
                 fn: 'count', arguments: [
@@ -98,8 +99,8 @@ test('count + distinct', () => {
 });
 
 test('percentile (90)', () => {
-    const selectClause = transpileSelectClause(`percentile("cpu_usage", 90)`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`percentile("cpu_usage", 90)`);
+    const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
                 fn: 'percentile', arguments: [
@@ -114,8 +115,8 @@ test('percentile (90)', () => {
 });
 
 test('percentile (99.9)', () => {
-    const selectClause = transpileSelectClause(` percentile(  "response_time"  ,  99.9)`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(` percentile(  "response_time"  ,  99.9)`);
+    const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
                 fn: 'percentile', arguments: [
@@ -133,8 +134,8 @@ test('percentile (99.9)', () => {
 test.each([
     'count', 'distinct', 'integral', 'mean', 'median', 'mode', 'spread',
 ])('basic aggregation functions (%s)', (fn: string) => {
-    const selectClause = transpileSelectClause(`${fn}("field")`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`${fn}("field")`);
+    const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
                 fn: fn, arguments: [{ pattern: '$', fields: ['"field"'], functions: [] }],
@@ -148,8 +149,8 @@ test.each([
 test.each([
     'first', 'last', 'max', 'min', 'sample',
 ])('basic selector functions (%s)', (fn: string) => {
-    const selectClause = transpileSelectClause(`${fn}("field")`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`${fn}("field")`);
+    const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
                 fn: fn, arguments: [{ pattern: '$', fields: ['"field"'], functions: [] }],
@@ -165,8 +166,8 @@ test.each([
     'non_negative_derivative', 'difference', 'non_negative_difference', 'elapsed', 'exp', 'floor',
     'ln', 'log2', 'log10', 'round', 'sin', 'sqrt', 'tan',
 ])('basic transform functions (%s)', (fn: string) => {
-    const selectClause = transpileSelectClause(`${fn}("field")`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`${fn}("field")`);
+    const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
                 fn: fn, arguments: [{ pattern: '$', fields: ['"field"'], functions: [] }],
@@ -180,8 +181,8 @@ test.each([
 test.each([
     'log', 'moving_average', 'pow',
 ])('advanced transform functions (%s)', (fn: string) => {
-    const selectClause = transpileSelectClause(`${fn}("field", 5)`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`${fn}("field", 5)`);
+    const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
                 fn: fn, arguments: [
@@ -196,8 +197,8 @@ test.each([
 });
 
 test('transform: atan2', () => {
-    const selectClause = transpileSelectClause(`atan2("altitude", "distance")`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`atan2("altitude", "distance")`);
+    const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
                 fn: 'atan2', arguments: [
@@ -212,8 +213,8 @@ test('transform: atan2', () => {
 });
 
 test('transform: derivative', () => {
-    const selectClause = transpileSelectClause(`derivative("field", 1.5m)`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`derivative("field", 1.5m)`);
+    const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
                 fn: 'derivative', arguments: [
@@ -228,8 +229,8 @@ test('transform: derivative', () => {
 });
 
 test('transform: non_negative_derivative', () => {
-    const selectClause = transpileSelectClause(`non_negative_derivative("field", 2s)`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`non_negative_derivative("field", 2s)`);
+    const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
                 fn: 'non_negative_derivative', arguments: [
@@ -244,29 +245,35 @@ test('transform: non_negative_derivative', () => {
 });
 
 test('math: 1', () => {
-    const selectClause = transpileSelectClause(`((  (("A" * "B"))))`);
-    const expressions: Expression[] = [{ pattern: '$ * $', fields: ['"A"', '"B"'], functions: [] }];
+    const selectClause = parseSelectClause(`((  (("A" * "B"))))`);
+    const expressions: SelectClause.Expression[] = [
+        { pattern: '$ * $', fields: ['"A"', '"B"'], functions: [] },
+    ];
     expect(selectClause.star).toBe(false);
     expect(selectClause.expressions).toEqual(expressions);
 });
 
 test('math: 2', () => {
-    const selectClause = transpileSelectClause(`C - 3 + "A" % ("B" + 1)`);
-    const expressions: Expression[] = [{ pattern: '$ - 3 + $ % ($ + 1)', fields: ['"C"', '"A"', '"B"'], functions: [] }];
+    const selectClause = parseSelectClause(`C - 3 + "A" % ("B" + 1)`);
+    const expressions: SelectClause.Expression[] = [
+        { pattern: '$ - 3 + $ % ($ + 1)', fields: ['"C"', '"A"', '"B"'], functions: [] },
+    ];
     expect(selectClause.star).toBe(false);
     expect(selectClause.expressions).toEqual(expressions);
 });
 
 test('math: 3', () => {
-    const selectClause = transpileSelectClause(`"A" ^ true`);
-    const expressions: Expression[] = [{ pattern: '$ ^ true', fields: ['"A"'], functions: [] }];
+    const selectClause = parseSelectClause(`"A" ^ true`);
+    const expressions: SelectClause.Expression[] = [
+        { pattern: '$ ^ true', fields: ['"A"'], functions: [] },
+    ];
     expect(selectClause.star).toBe(false);
     expect(selectClause.expressions).toEqual(expressions);
 });
 
 test('math: 4', () => {
-    const selectClause = transpileSelectClause(`A - 5, 2 * "B"`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(`A - 5, 2 * "B"`);
+    const expressions: SelectClause.Expression[] = [
         { pattern: '$ - 5', fields: ['"A"'], functions: [] },
         { pattern: '2 * $', fields: ['"B"'], functions: [] },
     ];
@@ -275,8 +282,9 @@ test('math: 4', () => {
 });
 
 test('math: 5', () => {
-    const selectClause = transpileSelectClause(`sum((((used)) * 100 + "A")) * 5 / derivative(30 - sum("total"), 10.5s)`);
-    const expressions: Expression[] = [
+    const selectClause = parseSelectClause(
+        `sum((((used)) * 100 + "A")) * 5 / derivative(30 - sum("total"), 10.5s)`);
+    const expressions: SelectClause.Expression[] = [
         {
             pattern: '# * 5 / #',
             fields: [],

@@ -1,53 +1,38 @@
+import type { WhereClause } from './types';
 import { removeUnnecessaryOuterBrackets } from './utility/removeUnnecessaryOuterBrackets';
 import { getMostOuterGroups } from './utility/getMostOuterGroups';
 import { REGEX_COMPARISON_OPERATORS, REGEX_FIELD_IN_PATTERN, REGEX_NUMBER, REGEX_TIMESTAMP } from './regexs';
 
-export interface Filter {
-    fields: string[];
-    fieldsPattern?: string;
-    operator: string;
-    value: string;
-}
-
-export interface Condition {
-    type: 'and' | 'or',
-    variables: (Condition | Filter)[];
-}
-
-interface WhereClause {
-    filters?: Condition | Filter;
-}
-
-export const transpileWhereClause = (influxQL: string): WhereClause => {
+export const parseWhereClause = (influxQL: string): WhereClause.Clause => {
     if (influxQL.trim().length === 0)
         return {};
 
     return { filters: parse(influxQL) };
 };
 
-const parse = (influxQL: string): Condition | Filter => {
+const parse = (influxQL: string): WhereClause.Condition | WhereClause.Filter => {
     influxQL = removeUnnecessaryOuterBrackets(influxQL);
 
     const orGroups = getMostOuterGroups(influxQL, ' or ');
     if (orGroups.length > 1)
-        return { type: 'or', variables: orGroups.map(parse) } as Condition;
+        return { type: 'or', variables: orGroups.map(parse) } as WhereClause.Condition;
 
     const andGroups = getMostOuterGroups(influxQL, ' and ');
     if (andGroups.length > 1)
-        return { type: 'and', variables: andGroups.map(parse) } as Condition;
+        return { type: 'and', variables: andGroups.map(parse) } as WhereClause.Condition;
 
     return parseFilter(influxQL);
 };
 
-const parseFilter = (influxQL: string): Filter => {
+const parseFilter = (influxQL: string): WhereClause.Filter => {
     const { fields, fieldsPattern } = formatFields(influxQL);
     const operator = formatOperator(influxQL);
     const value = formatValue(influxQL, operator);
 
     if (fieldsPattern === '$')
-        return { fields, operator, value } as Filter;
+        return { fields, operator, value } as WhereClause.Filter;
 
-    return { fields, fieldsPattern, operator, value } as Filter;
+    return { fields, fieldsPattern, operator, value } as WhereClause.Filter;
 };
 
 const formatFields = (influxQL: string): { fields: string[], fieldsPattern: string } => {

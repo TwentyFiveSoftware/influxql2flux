@@ -1,13 +1,9 @@
+import type { FillClause } from './types';
 import { matchInfluxFunctions } from './utility/matchInfluxFunction';
 import { REGEX_NUMBER } from './regexs';
 
-interface FillClause {
-    usePrevious: boolean;
-    value: string;
-}
-
-export const transpileFillClause = (influxQL: string): FillClause => {
-    const fillClause: FillClause = {
+export const parseFillClause = (influxQL: string): FillClause.Clause => {
+    const fillClause: FillClause.Clause = {
         usePrevious: false,
         value: '',
     };

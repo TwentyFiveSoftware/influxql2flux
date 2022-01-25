@@ -1,11 +1,7 @@
-interface GroupByClause {
-    columns: string[];
-    star: boolean;
-    timeInterval?: string;
-}
+import type { GroupByClause } from './types';
 
-export const transpileGroupByClause = (influxQL: string): GroupByClause => {
-    const groupByClause: GroupByClause = {
+export const parseGroupByClause = (influxQL: string): GroupByClause.Clause => {
+    const groupByClause: GroupByClause.Clause = {
         columns: [],
         star: false,
     };

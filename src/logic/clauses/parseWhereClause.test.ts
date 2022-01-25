@@ -1,55 +1,63 @@
-import { Condition, Filter, transpileWhereClause } from './transpileWhereClause';
+import { parseWhereClause } from './parseWhereClause';
+import type { WhereClause } from './types';
 
 test('empty', () => {
-    const whereClause = transpileWhereClause(``);
+    const whereClause = parseWhereClause(``);
     expect(whereClause.filters).toBeUndefined();
 });
 
 test('equals', () => {
-    const whereClause = transpileWhereClause(`host = "frontend"`);
-    const expected: Filter = { fields: ['host'], operator: '==', value: '"frontend"' };
+    const whereClause = parseWhereClause(`host = "frontend"`);
+    const expected: WhereClause.Filter =
+        { fields: ['host'], operator: '==', value: '"frontend"' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('less', () => {
-    const whereClause = transpileWhereClause(`time   < '2022-01-01T00:00:00Z'`);
-    const expected: Filter = { fields: ['time'], operator: '<', value: '2022-01-01T00:00:00Z' };
+    const whereClause = parseWhereClause(`time   < '2022-01-01T00:00:00Z'`);
+    const expected: WhereClause.Filter =
+        { fields: ['time'], operator: '<', value: '2022-01-01T00:00:00Z' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('greater equals', () => {
-    const whereClause = transpileWhereClause(`_value >= -25.25`);
-    const expected: Filter = { fields: ['_value'], operator: '>=', value: '-25.25' };
+    const whereClause = parseWhereClause(`_value >= -25.25`);
+    const expected: WhereClause.Filter =
+        { fields: ['_value'], operator: '>=', value: '-25.25' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('not equals (<>)', () => {
-    const whereClause = transpileWhereClause(`"impact location" <> "Europe"`);
-    const expected: Filter = { fields: ['"impact location"'], operator: '!=', value: '"Europe"' };
+    const whereClause = parseWhereClause(`"impact location" <> "Europe"`);
+    const expected: WhereClause.Filter =
+        { fields: ['"impact location"'], operator: '!=', value: '"Europe"' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('not equals (!=)', () => {
-    const whereClause = transpileWhereClause(`(("impact location" != "Europe"))`);
-    const expected: Filter = { fields: ['"impact location"'], operator: '!=', value: '"Europe"' };
+    const whereClause = parseWhereClause(`(("impact location" != "Europe"))`);
+    const expected: WhereClause.Filter =
+        { fields: ['"impact location"'], operator: '!=', value: '"Europe"' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('regex (=~)', () => {
-    const whereClause = transpileWhereClause(`'host' =~ /^[a-z]+-eu$/`);
-    const expected: Filter = { fields: ['host'], operator: '=~', value: '/^[a-z]+-eu$/' };
+    const whereClause = parseWhereClause(`'host' =~ /^[a-z]+-eu$/`);
+    const expected: WhereClause.Filter =
+        { fields: ['host'], operator: '=~', value: '/^[a-z]+-eu$/' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('regex (!~)', () => {
-    const whereClause = transpileWhereClause(`'host' !~   /^[0-9]+$/`);
-    const expected: Filter = { fields: ['host'], operator: '!~', value: '/^[0-9]+$/' };
+    const whereClause = parseWhereClause(`'host' !~   /^[0-9]+$/`);
+    const expected: WhereClause.Filter =
+        { fields: ['host'], operator: '!~', value: '/^[0-9]+$/' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('multiple conditions (and) 1', () => {
-    const whereClause = transpileWhereClause(`'user agent' = 'Chrome' and region <> "Northern America"`);
-    const expected: Condition = {
+    const whereClause = parseWhereClause(`'user agent' = 'Chrome' and region <> "Northern America"`);
+    const expected: WhereClause.Condition = {
         type: 'and',
         variables: [
             { fields: ['"user agent"'], operator: '==', value: '"Chrome"' },
@@ -60,8 +68,8 @@ test('multiple conditions (and) 1', () => {
 });
 
 test('multiple conditions (and) 2', () => {
-    const whereClause = transpileWhereClause(`a = 1 and b = 2 and c = 3`);
-    const expected: Condition = {
+    const whereClause = parseWhereClause(`a = 1 and b = 2 and c = 3`);
+    const expected: WhereClause.Condition = {
         type: 'and',
         variables: [
             { fields: ['a'], operator: '==', value: '1' },
@@ -73,8 +81,8 @@ test('multiple conditions (and) 2', () => {
 });
 
 test('multiple conditions (and) 3', () => {
-    const whereClause = transpileWhereClause(`(_value >= -3.5 and _value <= 9999) and time > now() - 7d`);
-    const expected: Condition = {
+    const whereClause = parseWhereClause(`(_value >= -3.5 and _value <= 9999) and time > now() - 7d`);
+    const expected: WhereClause.Condition = {
         type: 'and',
         variables: [
             {
@@ -91,8 +99,8 @@ test('multiple conditions (and) 3', () => {
 });
 
 test('multiple conditions (or) 1', () => {
-    const whereClause = transpileWhereClause(`a = 1 or b = 2 or c = 3`);
-    const expected: Condition = {
+    const whereClause = parseWhereClause(`a = 1 or b = 2 or c = 3`);
+    const expected: WhereClause.Condition = {
         type: 'or',
         variables: [
             { fields: ['a'], operator: '==', value: '1' },
@@ -104,8 +112,8 @@ test('multiple conditions (or) 1', () => {
 });
 
 test('multiple conditions (or) 2', () => {
-    const whereClause = transpileWhereClause(`a = 1 or (b = 2 or (c = 3))`);
-    const expected: Condition = {
+    const whereClause = parseWhereClause(`a = 1 or (b = 2 or (c = 3))`);
+    const expected: WhereClause.Condition = {
         type: 'or',
         variables: [
             { fields: ['a'], operator: '==', value: '1' },
@@ -122,8 +130,8 @@ test('multiple conditions (or) 2', () => {
 });
 
 test('and/or precedence', () => {
-    const whereClause = transpileWhereClause(`a > 5 or b = 7 and c = 3`);
-    const expected: Condition = {
+    const whereClause = parseWhereClause(`a > 5 or b = 7 and c = 3`);
+    const expected: WhereClause.Condition = {
         type: 'or',
         variables: [
             { fields: ['a'], operator: '>', value: '5' },
@@ -140,8 +148,9 @@ test('and/or precedence', () => {
 });
 
 test('complex and / or', () => {
-    const whereClause = transpileWhereClause(`((a > 5 or (b = 7)) and ((c != 5))) and d = 99 or (e <> 25 or f = 9)`);
-    const expected: Condition = {
+    const whereClause = parseWhereClause(
+        `((a > 5 or (b = 7)) and ((c != 5))) and d = 99 or (e <> 25 or f = 9)`);
+    const expected: WhereClause.Condition = {
         type: 'or',
         variables: [
             {
@@ -176,67 +185,78 @@ test('complex and / or', () => {
 });
 
 test('arithmetic (addition) 1', () => {
-    const whereClause = transpileWhereClause(`"water_level" + 2 > 11.9`);
-    const expected: Filter = { fields: ['water_level'], fieldsPattern: '$ + 2', operator: '>', value: '11.9' };
+    const whereClause = parseWhereClause(`"water_level" + 2 > 11.9`);
+    const expected: WhereClause.Filter =
+        { fields: ['water_level'], fieldsPattern: '$ + 2', operator: '>', value: '11.9' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('arithmetic (addition) 2', () => {
-    const whereClause = transpileWhereClause(`"A a" + "B" = 10`);
-    const expected: Filter = { fields: ['"A a"', 'B'], fieldsPattern: '$ + $', operator: '==', value: '10' };
+    const whereClause = parseWhereClause(`"A a" + "B" = 10`);
+    const expected: WhereClause.Filter =
+        { fields: ['"A a"', 'B'], fieldsPattern: '$ + $', operator: '==', value: '10' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('arithmetic (subtraction) 1', () => {
-    const whereClause = transpileWhereClause(`1 -   a - "b b bb"   -  'c' <= 3`);
-    const expected: Filter = { fields: ['a', '"b b bb"', 'c'], fieldsPattern: '1 - $ - $ - $', operator: '<=', value: '3' };
+    const whereClause = parseWhereClause(`1 -   a - "b b bb"   -  'c' <= 3`);
+    const expected: WhereClause.Filter =
+        { fields: ['a', '"b b bb"', 'c'], fieldsPattern: '1 - $ - $ - $', operator: '<=', value: '3' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('arithmetic (subtraction) 2', () => {
-    const whereClause = transpileWhereClause(`-a < -2.5`);
-    const expected: Filter = { fields: ['a'], fieldsPattern: '-$', operator: '<', value: '-2.5' };
+    const whereClause = parseWhereClause(`-a < -2.5`);
+    const expected: WhereClause.Filter =
+        { fields: ['a'], fieldsPattern: '-$', operator: '<', value: '-2.5' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('arithmetic (multiplication) 1', () => {
-    const whereClause = transpileWhereClause(`a * 10 >= 20`);
-    const expected: Filter = { fields: ['a'], fieldsPattern: '$ * 10', operator: '>=', value: '20' };
+    const whereClause = parseWhereClause(`a * 10 >= 20`);
+    const expected: WhereClause.Filter =
+        { fields: ['a'], fieldsPattern: '$ * 10', operator: '>=', value: '20' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('arithmetic (multiplication) 2', () => {
-    const whereClause = transpileWhereClause(`(a + "b") * 3.5 - -1 > 999`);
-    const expected: Filter = { fields: ['a', 'b'], fieldsPattern: '($ + $) * 3.5 - -1', operator: '>', value: '999' };
+    const whereClause = parseWhereClause(`(a + "b") * 3.5 - -1 > 999`);
+    const expected: WhereClause.Filter =
+        { fields: ['a', 'b'], fieldsPattern: '($ + $) * 3.5 - -1', operator: '>', value: '999' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('arithmetic (division)', () => {
-    const whereClause = transpileWhereClause(`100 / 'A' / "B" != 2`);
-    const expected: Filter = { fields: ['A', 'B'], fieldsPattern: '100 / $ / $', operator: '!=', value: '2' };
+    const whereClause = parseWhereClause(`100 / 'A' / "B" != 2`);
+    const expected: WhereClause.Filter =
+        { fields: ['A', 'B'], fieldsPattern: '100 / $ / $', operator: '!=', value: '2' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('arithmetic (modulo)', () => {
-    const whereClause = transpileWhereClause(`a % 2 = 0`);
-    const expected: Filter = { fields: ['a'], fieldsPattern: '$ % 2', operator: '==', value: '0' };
+    const whereClause = parseWhereClause(`a % 2 = 0`);
+    const expected: WhereClause.Filter =
+        { fields: ['a'], fieldsPattern: '$ % 2', operator: '==', value: '0' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('arithmetic (bitwise and)', () => {
-    const whereClause = transpileWhereClause(`(a & 15 > 0)`);
-    const expected: Filter = { fields: ['a'], fieldsPattern: '$ & 15', operator: '>', value: '0' };
+    const whereClause = parseWhereClause(`(a & 15 > 0)`);
+    const expected: WhereClause.Filter =
+        { fields: ['a'], fieldsPattern: '$ & 15', operator: '>', value: '0' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('arithmetic (bitwise or)', () => {
-    const whereClause = transpileWhereClause(`((a | b) <> 0)`);
-    const expected: Filter = { fields: ['a', 'b'], fieldsPattern: '$ | $', operator: '!=', value: '0' };
+    const whereClause = parseWhereClause(`((a | b) <> 0)`);
+    const expected: WhereClause.Filter =
+        { fields: ['a', 'b'], fieldsPattern: '$ | $', operator: '!=', value: '0' };
     expect(whereClause.filters).toEqual(expected);
 });
 
 test('arithmetic (bitwise exclusive-or)', () => {
-    const whereClause = transpileWhereClause(`a ^ true = 2`);
-    const expected: Filter = { fields: ['a'], fieldsPattern: '$ ^ true', operator: '==', value: '2' };
+    const whereClause = parseWhereClause(`a ^ true = 2`);
+    const expected: WhereClause.Filter =
+        { fields: ['a'], fieldsPattern: '$ ^ true', operator: '==', value: '2' };
     expect(whereClause.filters).toEqual(expected);
 });

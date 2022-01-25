@@ -1,11 +1,7 @@
-interface FromClause {
-    bucket: string;
-    retention?: string;
-    measurement?: string;
-}
+import type { FromClause } from './types';
 
-export const transpileFromClause = (influxQL: string): FromClause => {
-    const fromClause: FromClause = {
+export const parseFromClause = (influxQL: string): FromClause.Clause => {
+    const fromClause: FromClause.Clause = {
         bucket: '',
     };
 

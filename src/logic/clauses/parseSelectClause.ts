@@ -1,26 +1,11 @@
+import type { SelectClause } from './types';
 import { removeUnnecessaryOuterBrackets } from './utility/removeUnnecessaryOuterBrackets';
 import { getMostOuterGroups } from './utility/getMostOuterGroups';
-import { REGEX_FIELD_IN_PATTERN, REGEX_TIME_INTERVAL } from './regexs';
 import { matchInfluxFunctions } from './utility/matchInfluxFunction';
+import { REGEX_FIELD_IN_PATTERN, REGEX_TIME_INTERVAL } from './regexs';
 
-interface Fn {
-    fn: string;
-    arguments: Expression[];
-}
-
-export interface Expression {
-    pattern: string;
-    fields: string[];
-    functions: Fn[];
-}
-
-interface SelectClause {
-    star: boolean;
-    expressions: Expression[];
-}
-
-export const transpileSelectClause = (influxQL: string): SelectClause => {
-    const selectClause: SelectClause = {
+export const parseSelectClause = (influxQL: string): SelectClause.Clause => {
+    const selectClause: SelectClause.Clause = {
         star: false,
         expressions: [],
     };
@@ -36,14 +21,14 @@ export const transpileSelectClause = (influxQL: string): SelectClause => {
     return selectClause;
 };
 
-const parse = (influxQL: string): Expression => {
+const parse = (influxQL: string): SelectClause.Expression => {
     const { functions, fnPattern } = parseFunctions(influxQL);
     const expression = parseExpression(fnPattern);
 
     return { pattern: expression.pattern, fields: expression.fields, functions };
 };
 
-const parseExpression = (influxQL: string): Expression => {
+const parseExpression = (influxQL: string): SelectClause.Expression => {
     influxQL = removeUnnecessaryOuterBrackets(influxQL);
 
     const timeIntervalMatch = influxQL.match(REGEX_TIME_INTERVAL);
@@ -70,7 +55,7 @@ const parseExpression = (influxQL: string): Expression => {
     return { pattern, fields, functions: [] };
 };
 
-const parseFunctions = (influxQL: string): { functions: Fn[], fnPattern: string } => {
+const parseFunctions = (influxQL: string): { functions: SelectClause.Fn[], fnPattern: string } => {
     const functions = matchInfluxFunctions(influxQL)
         .sort((a, b) => a.fromIndex - b.fromIndex);
 
