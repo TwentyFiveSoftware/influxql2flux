@@ -1,10 +1,9 @@
 import { generatePipeline } from './generatePipeline';
 import type { Clauses } from '../clauses/types';
+import type { PipelineStage } from './types';
 
 test('empty', () => {
-    const clauses: Clauses = {};
-    const pipeline = generatePipeline(clauses);
-    expect(pipeline.stages).toEqual([]);
+    expect(generatePipeline({}).stages).toEqual([]);
 });
 
 test('simple test', () => {
@@ -18,11 +17,12 @@ test('simple test', () => {
         from: { bucket: 'system' },
     };
 
-    expect(generatePipeline(clauses)).toEqual({
-        from: { bucket: 'system' },
-        filters: [{ pattern: '$ == "ram_usage"', fields: ['_field'] }],
-        stages: [],
-    });
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: 'system' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "ram_usage"' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
 });
 
 test('basic filter test', () => {
@@ -45,15 +45,14 @@ test('basic filter test', () => {
         },
     };
 
-    expect(generatePipeline(clauses)).toEqual({
-        from: { bucket: 'system', retention: 'autogen' },
-        filters: [
-            { pattern: '$ == "cpu" or $ == "ram"', fields: ['_field', '_field'] },
-            { pattern: '$ =~ /$host/', fields: ['host'] },
-            { pattern: '$ + $ != "m-1"', fields: ['"data center"', 'nr'] },
-        ],
-        stages: [],
-    });
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: 'system/autogen' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "cpu" or r._field == "ram"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r.host =~ /$host/' } },
+        { fn: 'filter', arguments: { fn: '(r) => r["data center"] + r.nr != "m-1"' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
 });
 
 test('complex filter test', () => {
@@ -86,18 +85,14 @@ test('complex filter test', () => {
         },
     };
 
-    expect(generatePipeline(clauses)).toEqual({
-        from: { bucket: 'system', retention: 'autogen' },
-        filters: [
-            { pattern: '$ == "cpu"', fields: ['_field'] },
-            { pattern: '$ > -3.5', fields: ['a'] },
-            {
-                pattern: '($ == 3 and $ == "xxx") or ($ - 5) * 3 < 100 or $ != "frontend"',
-                fields: ['b', 'c', 'd', 'e'],
-            },
-        ],
-        stages: [],
-    });
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: 'system/autogen' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "cpu"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r.a > -3.5' } },
+        { fn: 'filter', arguments: { fn: '(r) => (r.b == 3 and r.c == "xxx") or (r.d - 5) * 3 < 100 or r.e != "frontend"' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
 });
 
 test('range (start only)', () => {
@@ -114,15 +109,14 @@ test('range (start only)', () => {
         },
     };
 
-    expect(generatePipeline(clauses)).toEqual({
-        from: { bucket: 'system' },
-        range: { start: '-7d' },
-        filters: [
-            { pattern: '$ == "cpu"', fields: ['_measurement'] },
-            { pattern: '$ == "usage"', fields: ['_field'] },
-        ],
-        stages: [],
-    });
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: 'system' } },
+        { fn: 'range', arguments: { start: '-7d' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._measurement == "cpu"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "usage"' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
 });
 
 test('range (stop only)', () => {
@@ -139,15 +133,14 @@ test('range (stop only)', () => {
         },
     };
 
-    expect(generatePipeline(clauses)).toEqual({
-        from: { bucket: 'system' },
-        range: { stop: '2022-01-01T00:00:00Z' },
-        filters: [
-            { pattern: '$ == "cpu"', fields: ['_measurement'] },
-            { pattern: '$ == "usage"', fields: ['_field'] },
-        ],
-        stages: [],
-    });
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: 'system' } },
+        { fn: 'range', arguments: { stop: '2022-01-01T00:00:00Z' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._measurement == "cpu"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "usage"' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
 });
 
 test('range (nested time filter)', () => {
@@ -174,13 +167,12 @@ test('range (nested time filter)', () => {
         },
     };
 
-    expect(generatePipeline(clauses)).toEqual({
-        from: { bucket: 'b' },
-        range: { start: 'now()' },
-        filters: [
-            { pattern: '$ == "a"', fields: ['_field'] },
-            { pattern: '$ < 2022-01-01T00:00:00Z or $ != 99', fields: ['_time', '"a a a"'] },
-        ],
-        stages: [],
-    });
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: 'b' } },
+        { fn: 'range', arguments: { start: 'now()' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "a"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._time < 2022-01-01T00:00:00Z or r["a a a"] != 99' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
 });

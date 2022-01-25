@@ -1,4 +1,4 @@
-import type { Pipeline, Stage } from './types';
+import type { Pipeline, PipelineStage } from './types';
 import type { Clauses } from '../clauses/types';
 import type { SelectClause } from '../clauses/types';
 import type { WhereClause } from '../clauses/types';
@@ -6,7 +6,6 @@ import { removeUnnecessaryOuterBrackets } from '../clauses/utility/removeUnneces
 
 export const generatePipeline = (clauses: Clauses): Pipeline => {
     const pipeline: Pipeline = {
-        filters: [],
         stages: [],
     };
 
@@ -14,51 +13,40 @@ export const generatePipeline = (clauses: Clauses): Pipeline => {
         return pipeline;
 
 
-    pipeline.from = {
-        bucket: clauses.from.bucket,
-        retention: clauses.from.retention,
-    };
+    const bucket = clauses.from.bucket + (clauses.from.retention ? `/${clauses.from.retention}` : '');
+    pipeline.stages.push({ fn: 'from', arguments: { bucket } });
+
+
+    const filterStages: string[] = [];
 
     if (clauses.from.measurement)
-        pipeline.filters.push({ pattern: `$ == "${clauses.from.measurement}"`, fields: ['_measurement'] });
+        filterStages.push(`(r) => r._measurement == "${clauses.from.measurement}"`);
 
 
     const usedFields: string[] = clauses.select.star ? [] : getUsedFields(clauses.select.expressions);
-    if (usedFields.length > 0) {
-        pipeline.filters.push({
-            pattern: usedFields.map(field => `$ == ${field}`).join(' or '),
-            fields: new Array(usedFields.length).fill('_field'),
-        });
-    }
+    if (usedFields.length > 0)
+        filterStages.push('(r) => ' + usedFields.map(field => `r._field == ${field}`).join(' or '));
 
 
     if (clauses.where && clauses.where.filters) {
+        const rangeStage = generateRangeStage(clauses.where.filters);
+        if (rangeStage)
+            pipeline.stages.push(rangeStage);
+
+
+        const isTimeFilter = (v: WhereClause.Condition | WhereClause.Filter) =>
+            'fields' in v && v.fields.length === 1 && v.fields[0] === 'time';
+
         if ('type' in clauses.where.filters && clauses.where.filters.type === 'and') {
             for (const variable of clauses.where.filters.variables)
-                pipeline.filters.push(generateFilter(variable));
+                if (!isTimeFilter(variable))
+                    filterStages.push(generateFilterStage(variable));
 
-        } else {
-            pipeline.filters.push(generateFilter(clauses.where.filters));
-        }
+        } else if (!isTimeFilter(clauses.where.filters))
+            filterStages.push(generateFilterStage(clauses.where.filters));
     }
 
-
-    for (const filter of pipeline.filters)
-        if (filter.fields.length === 1 && filter.fields[0] === '_time') {
-            let value = filter.pattern.substring(4).trim();
-
-            if (value.replace('now()', '').trim().length > 0)
-                value = value.replace(/now\(\)| /g, '');
-
-            pipeline.range = { ...pipeline.range };
-
-            if (filter.pattern.startsWith('$ <'))
-                pipeline.range.stop = value;
-            else if (filter.pattern.startsWith('$ >'))
-                pipeline.range.start = value;
-        }
-
-    pipeline.filters = pipeline.filters.filter(filter => !(filter.fields.length === 1 && filter.fields[0] === '_time'));
+    pipeline.stages.push(...filterStages.map(fn => ({ fn: 'filter', arguments: { fn } })));
 
 
     return pipeline;
@@ -77,30 +65,43 @@ const getUsedFields = (expressions: SelectClause.Expression[]): string[] => {
     return Array.from(new Set(fields));
 };
 
-const generateFilter = (variable: WhereClause.Condition | WhereClause.Filter): Stage.Filter => {
-    const generateFilterPattern = (variable: WhereClause.Condition | WhereClause.Filter): string => {
+const generateFilterStage = (variable: WhereClause.Condition | WhereClause.Filter): string => {
+    const generateFilterFunction = (variable: WhereClause.Condition | WhereClause.Filter): string => {
         if ('type' in variable)
-            return '(' + variable.variables.map(generateFilterPattern).join(` ${variable.type} `) + ')';
+            return '(' + variable.variables.map(generateFilterFunction).join(` ${variable.type} `) + ')';
 
-        return `${variable.fieldsPattern ?? '$'} ${variable.operator} ${variable.value}`;
-    };
-
-    const getFilterFields = (variable: WhereClause.Condition | WhereClause.Filter): string[] => {
-        const fields: string[] = [];
-
-        if ('type' in variable) {
-            for (const v of variable.variables)
-                fields.push(...getFilterFields(v));
-
-        } else {
-            fields.push(...variable.fields);
+        let pattern = variable.fieldsPattern ?? '$';
+        for (let field of variable.fields) {
+            field = field === 'time' ? '_time' : field;
+            pattern = pattern.replace('$', field.startsWith('"') ? `r[${field}]` : `r.${field}`);
         }
 
-        return fields;
+        return `${pattern} ${variable.operator} ${variable.value}`;
     };
 
-    const pattern = removeUnnecessaryOuterBrackets(generateFilterPattern(variable));
-    const fields = getFilterFields(variable).map(f => f === 'time' ? '_time' : f);
-    return { fields, pattern };
+    return '(r) => ' + removeUnnecessaryOuterBrackets(generateFilterFunction(variable));
 };
 
+const generateRangeStage = (filters: WhereClause.Condition | WhereClause.Filter): PipelineStage | null => {
+    const filtersToCheck: WhereClause.Filter[] = (('type' in filters && filters.type === 'and')
+        ? filters.variables.filter(v => 'fields' in v) : [filters]) as WhereClause.Filter[];
+
+    let rangeStage: PipelineStage = { fn: 'range', arguments: {} };
+
+    for (const filter of filtersToCheck)
+        if (filter.fields.length === 1 && filter.fields[0] === 'time') {
+            const value = filter.value.replace('now()', '').length === 0
+                ? filter.value
+                : filter.value.replace(/now\(\)| /g, '');
+
+            if (filter.operator === '>' || filter.operator === '>=')
+                rangeStage.arguments.start = value;
+            else if (filter.operator === '<' || filter.operator === '<=')
+                rangeStage.arguments.stop = value;
+        }
+
+    if (!('start' in rangeStage.arguments || 'stop' in rangeStage.arguments))
+        return null;
+
+    return rangeStage;
+};
