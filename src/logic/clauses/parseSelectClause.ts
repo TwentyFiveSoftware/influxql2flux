@@ -40,10 +40,12 @@ const parseExpression = (influxQL: string): SelectClause.Expression => {
     const fields: string[] = [];
 
     for (const fieldMatch of influxQL.matchAll(REGEX_FIELD_IN_PATTERN)) {
-        const field: string = fieldMatch[1] ?? fieldMatch[2] ?? fieldMatch[3] ?? fieldMatch[0];
+        let field: string = fieldMatch[1] ?? fieldMatch[2] ?? fieldMatch[3] ?? fieldMatch[0];
 
         if (field.toLowerCase() === 'true' || field.toLowerCase() === 'false')
             continue;
+
+        field = field.toLowerCase() === 'time' ? '_time' : field;
 
         fields.push(`"${field}"`);
         pattern = pattern.replace(fieldMatch[0], '$');

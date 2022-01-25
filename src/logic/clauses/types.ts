@@ -35,6 +35,7 @@ export namespace FromClause {
 export namespace WhereClause {
     export interface Clause {
         filters?: Condition | Filter;
+        timeFilters: Filter[];
     }
 
     export interface Condition {
@@ -48,6 +49,8 @@ export namespace WhereClause {
         operator: string;
         value: string;
     }
+
+    export type Filters = WhereClause.Condition | WhereClause.Filter | undefined;
 }
 
 export namespace GroupByClause {

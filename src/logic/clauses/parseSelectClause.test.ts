@@ -43,6 +43,15 @@ test('three fields', () => {
     expect(selectClause.expressions).toEqual(expressions);
 });
 
+test('time field', () => {
+    const selectClause = parseSelectClause(`"time"`);
+    const expressions: SelectClause.Expression[] = [
+        { pattern: '$', fields: ['"_time"'], functions: [] },
+    ];
+    expect(selectClause.star).toBe(false);
+    expect(selectClause.expressions).toEqual(expressions);
+});
+
 test('bottom', () => {
     const selectClause = parseSelectClause(`bottom("water level", 7)`);
     const expressions: SelectClause.Expression[] = [

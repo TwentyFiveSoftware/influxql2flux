@@ -15,9 +15,9 @@ test('equals', () => {
 
 test('less', () => {
     const whereClause = parseWhereClause(`time   < '2022-01-01T00:00:00Z'`);
-    const expected: WhereClause.Filter =
-        { fields: ['time'], operator: '<', value: '2022-01-01T00:00:00Z' };
-    expect(whereClause.filters).toEqual(expected);
+    expect(whereClause.filters).toBeUndefined();
+    expect(whereClause.timeFilters).toEqual(
+        [{ fields: ['_time'], operator: '<', value: '2022-01-01T00:00:00Z' }]);
 });
 
 test('greater equals', () => {
@@ -85,17 +85,12 @@ test('multiple conditions (and) 3', () => {
     const expected: WhereClause.Condition = {
         type: 'and',
         variables: [
-            {
-                type: 'and',
-                variables: [
-                    { fields: ['_value'], operator: '>=', value: '-3.5' },
-                    { fields: ['_value'], operator: '<=', value: '9999' },
-                ],
-            },
-            { fields: ['time'], operator: '>', value: 'now() - 7d' },
+            { fields: ['_value'], operator: '>=', value: '-3.5' },
+            { fields: ['_value'], operator: '<=', value: '9999' },
         ],
     };
     expect(whereClause.filters).toEqual(expected);
+    expect(whereClause.timeFilters).toEqual([{ fields: ['_time'], operator: '>', value: '-7d' }]);
 });
 
 test('multiple conditions (or) 1', () => {
@@ -259,4 +254,50 @@ test('arithmetic (bitwise exclusive-or)', () => {
     const expected: WhereClause.Filter =
         { fields: ['a'], fieldsPattern: '$ ^ true', operator: '==', value: '2' };
     expect(whereClause.filters).toEqual(expected);
+});
+
+test('nested ands', () => {
+    const whereClause = parseWhereClause(`a > 5 and ((b < 3 and c = 5) and d = 9)`);
+    const expected: WhereClause.Condition = {
+        type: 'and',
+        variables: [
+            { fields: ['a'], operator: '>', value: '5' },
+            { fields: ['b'], operator: '<', value: '3' },
+            { fields: ['c'], operator: '==', value: '5' },
+            { fields: ['d'], operator: '==', value: '9' },
+        ],
+    };
+    expect(whereClause.filters).toEqual(expected);
+});
+
+test('time filters 1', () => {
+    const whereClause = parseWhereClause(`time > now() - 14d and time < now() + 12h`);
+    expect(whereClause.filters).toBeUndefined();
+    expect(whereClause.timeFilters).toEqual([
+        { fields: ['_time'], operator: '>', value: '-14d' },
+        { fields: ['_time'], operator: '<', value: '+12h' },
+    ]);
+});
+
+test('time filters 2', () => {
+    const whereClause = parseWhereClause(`time > now() - 14d and (a > 5 or time < now() + 1.5mo)`);
+    const expected: WhereClause.Condition = {
+        type: 'or',
+        variables: [
+            { fields: ['a'], operator: '>', value: '5' },
+            { fields: ['_time'], operator: '<', value: 'now() + 1.5mo' },
+        ],
+    };
+    expect(whereClause.filters).toEqual(expected);
+    expect(whereClause.timeFilters).toEqual([
+        { fields: ['_time'], operator: '>', value: '-14d' },
+    ]);
+});
+
+test('time filters 3', () => {
+    const whereClause = parseWhereClause(`time >= now()`);
+    expect(whereClause.filters).toBeUndefined();
+    expect(whereClause.timeFilters).toEqual([
+        { fields: ['_time'], operator: '>=', value: 'now()' },
+    ]);
 });

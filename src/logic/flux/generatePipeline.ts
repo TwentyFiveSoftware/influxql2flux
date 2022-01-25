@@ -28,21 +28,18 @@ export const generatePipeline = (clauses: Clauses): Pipeline => {
         filterStages.push('(r) => ' + usedFields.map(field => `r._field == ${field}`).join(' or '));
 
 
-    if (clauses.where && clauses.where.filters) {
-        const rangeStage = generateRangeStage(clauses.where.filters);
+    if (clauses.where && clauses.where.timeFilters.length > 0) {
+        const rangeStage = generateRangeStage(clauses.where.timeFilters);
         if (rangeStage)
             pipeline.stages.push(rangeStage);
+    }
 
-
-        const isTimeFilter = (v: WhereClause.Condition | WhereClause.Filter) =>
-            'fields' in v && v.fields.length === 1 && v.fields[0] === 'time';
-
+    if (clauses.where && clauses.where.filters) {
         if ('type' in clauses.where.filters && clauses.where.filters.type === 'and') {
             for (const variable of clauses.where.filters.variables)
-                if (!isTimeFilter(variable))
-                    filterStages.push(generateFilterStage(variable));
+                filterStages.push(generateFilterStage(variable));
 
-        } else if (!isTimeFilter(clauses.where.filters))
+        } else
             filterStages.push(generateFilterStage(clauses.where.filters));
     }
 
@@ -82,23 +79,14 @@ const generateFilterStage = (variable: WhereClause.Condition | WhereClause.Filte
     return '(r) => ' + removeUnnecessaryOuterBrackets(generateFilterFunction(variable));
 };
 
-const generateRangeStage = (filters: WhereClause.Condition | WhereClause.Filter): PipelineStage | null => {
-    const filtersToCheck: WhereClause.Filter[] = (('type' in filters && filters.type === 'and')
-        ? filters.variables.filter(v => 'fields' in v) : [filters]) as WhereClause.Filter[];
-
+const generateRangeStage = (timeFilters: WhereClause.Filter[]): PipelineStage | null => {
     let rangeStage: PipelineStage = { fn: 'range', arguments: {} };
 
-    for (const filter of filtersToCheck)
-        if (filter.fields.length === 1 && filter.fields[0] === 'time') {
-            const value = filter.value.replace('now()', '').length === 0
-                ? filter.value
-                : filter.value.replace(/now\(\)| /g, '');
-
-            if (filter.operator === '>' || filter.operator === '>=')
-                rangeStage.arguments.start = value;
-            else if (filter.operator === '<' || filter.operator === '<=')
-                rangeStage.arguments.stop = value;
-        }
+    for (const filter of timeFilters)
+        if (filter.operator === '>' || filter.operator === '>=')
+            rangeStage.arguments.start = filter.value;
+        else if (filter.operator === '<' || filter.operator === '<=')
+            rangeStage.arguments.stop = filter.value;
 
     if (!('start' in rangeStage.arguments || 'stop' in rangeStage.arguments))
         return null;

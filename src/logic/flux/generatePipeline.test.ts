@@ -42,6 +42,7 @@ test('basic filter test', () => {
                     { fields: ['"data center"', 'nr'], fieldsPattern: '$ + $', operator: '!=', value: '"m-1"' },
                 ],
             },
+            timeFilters: [],
         },
     };
 
@@ -82,6 +83,7 @@ test('complex filter test', () => {
                     },
                 ],
             },
+            timeFilters: [],
         },
     };
 
@@ -105,7 +107,7 @@ test('range (start only)', () => {
         },
         from: { bucket: 'system', measurement: 'cpu' },
         where: {
-            filters: { fields: ['time'], operator: '>=', value: 'now() - 7d' },
+            timeFilters: [{ fields: ['_time'], operator: '>=', value: '-7d' }],
         },
     };
 
@@ -129,7 +131,7 @@ test('range (stop only)', () => {
         },
         from: { bucket: 'system', measurement: 'cpu' },
         where: {
-            filters: { fields: ['time'], operator: '<', value: '2022-01-01T00:00:00Z' },
+            timeFilters: [{ fields: ['_time'], operator: '<', value: '2022-01-01T00:00:00Z' }],
         },
     };
 
@@ -154,16 +156,12 @@ test('range (nested time filter)', () => {
         from: { bucket: 'b' },
         where: {
             filters: {
-                type: 'and', variables: [
-                    { fields: ['time'], operator: '>', value: 'now()' },
-                    {
-                        type: 'or', variables: [
-                            { fields: ['time'], operator: '<', value: '2022-01-01T00:00:00Z' },
-                            { fields: ['"a a a"'], operator: '!=', value: '99' },
-                        ],
-                    },
+                type: 'or', variables: [
+                    { fields: ['_time'], operator: '<', value: '2022-01-01T00:00:00Z' },
+                    { fields: ['"a a a"'], operator: '!=', value: '99' },
                 ],
             },
+            timeFilters: [{ fields: ['_time'], operator: '>', value: 'now()' }],
         },
     };
 

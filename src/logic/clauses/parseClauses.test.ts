@@ -46,13 +46,10 @@ test('select, from, where', () => {
         },
         from: { bucket: 'requests', retention: 'autogen', measurement: 'frontend' },
         where: {
-            filters: {
-                type: 'and',
-                variables: [
-                    { fields: ['time'], operator: '>=', value: '2022-01-01T00:00:00Z' },
-                    { fields: ['time'], operator: '<', value: 'now() - 1h' },
-                ],
-            },
+            timeFilters: [
+                { fields: ['_time'], operator: '>=', value: '2022-01-01T00:00:00Z' },
+                { fields: ['_time'], operator: '<', value: '-1h' },
+            ],
         },
     });
 });
@@ -84,6 +81,7 @@ test('select, from, where (math)', () => {
                     { fields: ['used', 'total'], operator: '>', value: '0.3', fieldsPattern: '$ / $' },
                 ],
             },
+            timeFilters: [],
         },
     });
 });
@@ -109,6 +107,7 @@ test('select, from, where, group', () => {
         from: { bucket: 'requests' },
         where: {
             filters: { fields: ['status_code'], operator: '>', value: '200' },
+            timeFilters: [],
         },
         groupBy: {
             star: false,
@@ -171,6 +170,7 @@ test('select, from, where, group, fill', () => {
         from: { bucket: 'fill' },
         where: {
             filters: { fields: ['from'], operator: '>', value: '1' },
+            timeFilters: [],
         },
         groupBy: {
             star: false,
@@ -226,6 +226,7 @@ test('select, from, where, fill', () => {
         from: { bucket: 'c' },
         where: {
             filters: { fields: ['d'], operator: '!~', value: '/xxx/' },
+            timeFilters: [],
         },
         fill: {
             usePrevious: false,
