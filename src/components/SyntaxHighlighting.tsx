@@ -37,8 +37,8 @@ const SyntaxHighlighting = ({ code }: Props) => {
             for (const fn of line.matchAll(/(==|>=|<=|=~|!~|!=|and|or|true|false)/gi))
                 tokens.push({ color: '#C678DD', text: fn[1] ?? '', index: fn.index ?? 0 });
 
-            for (const fn of line.matchAll(/\t(>)\t|\t(<)\t/gi))
-                tokens.push({ color: '#C678DD', text: fn[1] ?? '', index: (fn.index ?? 0) + 1 });
+            for (const fn of line.matchAll(/ (>) | (<) | ([+*\\|%^&-]) /gi))
+                tokens.push({ color: '#C678DD', text: fn[1] ?? fn[2] ?? fn[3] ?? '', index: (fn.index ?? 0) + 1 });
 
 
             const sortedTokens = tokens.sort((a, b) => a.index - b.index);
