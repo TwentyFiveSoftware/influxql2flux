@@ -13,7 +13,7 @@ export const generatePipeline = (clauses: Clauses): Pipeline => {
         return pipeline;
 
 
-    const bucket = clauses.from.bucket + (clauses.from.retention ? `/${clauses.from.retention}` : '');
+    const bucket = `"${clauses.from.bucket}${clauses.from.retention ? `/${clauses.from.retention}` : ''}"`;
     pipeline.stages.push({ fn: 'from', arguments: { bucket } });
 
 

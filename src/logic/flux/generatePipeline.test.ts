@@ -18,7 +18,7 @@ test('simple test', () => {
     };
 
     const stages: PipelineStage[] = [
-        { fn: 'from', arguments: { bucket: 'system' } },
+        { fn: 'from', arguments: { bucket: '"system"' } },
         { fn: 'filter', arguments: { fn: '(r) => r._field == "ram_usage"' } },
     ];
 
@@ -46,7 +46,7 @@ test('basic filter test', () => {
     };
 
     const stages: PipelineStage[] = [
-        { fn: 'from', arguments: { bucket: 'system/autogen' } },
+        { fn: 'from', arguments: { bucket: '"system/autogen"' } },
         { fn: 'filter', arguments: { fn: '(r) => r._field == "cpu" or r._field == "ram"' } },
         { fn: 'filter', arguments: { fn: '(r) => r.host =~ /$host/' } },
         { fn: 'filter', arguments: { fn: '(r) => r["data center"] + r.nr != "m-1"' } },
@@ -86,7 +86,7 @@ test('complex filter test', () => {
     };
 
     const stages: PipelineStage[] = [
-        { fn: 'from', arguments: { bucket: 'system/autogen' } },
+        { fn: 'from', arguments: { bucket: '"system/autogen"' } },
         { fn: 'filter', arguments: { fn: '(r) => r._field == "cpu"' } },
         { fn: 'filter', arguments: { fn: '(r) => r.a > -3.5' } },
         { fn: 'filter', arguments: { fn: '(r) => (r.b == 3 and r.c == "xxx") or (r.d - 5) * 3 < 100 or r.e != "frontend"' } },
@@ -110,7 +110,7 @@ test('range (start only)', () => {
     };
 
     const stages: PipelineStage[] = [
-        { fn: 'from', arguments: { bucket: 'system' } },
+        { fn: 'from', arguments: { bucket: '"system"' } },
         { fn: 'range', arguments: { start: '-7d' } },
         { fn: 'filter', arguments: { fn: '(r) => r._measurement == "cpu"' } },
         { fn: 'filter', arguments: { fn: '(r) => r._field == "usage"' } },
@@ -134,7 +134,7 @@ test('range (stop only)', () => {
     };
 
     const stages: PipelineStage[] = [
-        { fn: 'from', arguments: { bucket: 'system' } },
+        { fn: 'from', arguments: { bucket: '"system"' } },
         { fn: 'range', arguments: { stop: '2022-01-01T00:00:00Z' } },
         { fn: 'filter', arguments: { fn: '(r) => r._measurement == "cpu"' } },
         { fn: 'filter', arguments: { fn: '(r) => r._field == "usage"' } },
@@ -168,7 +168,7 @@ test('range (nested time filter)', () => {
     };
 
     const stages: PipelineStage[] = [
-        { fn: 'from', arguments: { bucket: 'b' } },
+        { fn: 'from', arguments: { bucket: '"b"' } },
         { fn: 'range', arguments: { start: 'now()' } },
         { fn: 'filter', arguments: { fn: '(r) => r._field == "a"' } },
         { fn: 'filter', arguments: { fn: '(r) => r._time < 2022-01-01T00:00:00Z or r["a a a"] != 99' } },
