@@ -7,7 +7,6 @@ interface Props {
 
 const SyntaxHighlighting = ({ code }: Props) => {
     const lines = code.split('\n')
-        .map(line => line.replace(/ /g, '\t'))
         .filter(line => line.trim().length > 0)
         .map(line => {
             const tokens: { color: string, text: string, index: number }[] = [];
@@ -31,8 +30,15 @@ const SyntaxHighlighting = ({ code }: Props) => {
             for (const fn of line.matchAll(/(-?[0-9]+(?:\.[0-9]*)?(?:y|mo|w|d|h|m|s|ms|us|µs|ns)?)/gi))
                 tokens.push({ color: '#D19A66', text: fn[1] ?? '', index: fn.index ?? 0 });
 
-            for (const fn of line.matchAll(/\t/g))
-                tokens.push({ color: '', text: '\t', index: fn.index ?? 0 });
+            // "T, Z, :" in timestamps (2022-01-01T00:00:00Z)
+            for (const fn of line.matchAll(/[0-9]{2}(T)|[0-9]{2}(Z)|[0-9]{2}(:)/gi))
+                tokens.push({ color: '#D19A66', text: fn[1] ?? fn[2] ?? fn[3] ?? '', index: (fn.index ?? 0) + 2 });
+
+            for (const fn of line.matchAll(/(==|>=|<=|=~|!~|!=|and|or|true|false)/gi))
+                tokens.push({ color: '#C678DD', text: fn[1] ?? '', index: fn.index ?? 0 });
+
+            for (const fn of line.matchAll(/\t(>)\t|\t(<)\t/gi))
+                tokens.push({ color: '#C678DD', text: fn[1] ?? '', index: (fn.index ?? 0) + 1 });
 
 
             const sortedTokens = tokens.sort((a, b) => a.index - b.index);
@@ -60,17 +66,15 @@ const SyntaxHighlighting = ({ code }: Props) => {
             if (document.activeElement !== document.querySelector('body'))
                 return;
 
-            if (e.ctrlKey && (e.key === 'a' || e.key === 'c')) {
+            if (e.ctrlKey && e.key === 'a') {
                 e.preventDefault();
 
                 const selection = window.getSelection();
+
                 const from = document.querySelector('code');
                 const to = document.querySelector('code div:last-child');
                 if (selection && from && to)
                     selection.setBaseAndExtent(from, 0, to, 0);
-
-                if (e.key === 'c' && selection)
-                    navigator.clipboard.writeText(selection.toString());
             }
         };
 
@@ -85,12 +89,9 @@ const SyntaxHighlighting = ({ code }: Props) => {
         <code className={styles.code}>
             {lines.map((line, lineIndex) => (
                 <div key={lineIndex}>
-                    {line.map((token, index) =>
-                        token.text === '\t' ? (
-                            <span className={styles.token} key={index}>&nbsp;</span>
-                        ) : (
-                            <span className={styles.token} key={index} style={{ color: token.color }}>{token.text}</span>
-                        ))}
+                    {line.map((token, index) => (
+                        <span className={styles.token} key={index} style={{ color: token.color }}>{token.text}</span>
+                    ))}
                 </div>
             ))}
             <div />
