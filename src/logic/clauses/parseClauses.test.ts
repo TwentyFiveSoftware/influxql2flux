@@ -8,7 +8,7 @@ test('empty', () => {
 test('select, from', () => {
     const clauses = parseClauses(`SELECT "cpu_Usage" from "system"`);
     expect(clauses).toEqual({
-        select: { star: false, expressions: [{ pattern: '$', fields: ['"cpu_Usage"'], functions: [] }] },
+        select: { star: false, expressions: [{ pattern: '$', fields: ['cpu_Usage'], functions: [] }] },
         from: { bucket: 'system' },
     });
 });
@@ -16,7 +16,7 @@ test('select, from', () => {
 test('select, from (math)', () => {
     const clauses = parseClauses(`select "a" * "b" from "c"."d"`);
     expect(clauses).toEqual({
-        select: { star: false, expressions: [{ pattern: '$ * $', fields: ['"a"', '"b"'], functions: [] }] },
+        select: { star: false, expressions: [{ pattern: '$ * $', fields: ['a', 'b'], functions: [] }] },
         from: { bucket: 'c', retention: 'd' },
     });
 });
@@ -35,7 +35,7 @@ test('select, from, where', () => {
                             pattern: '#', fields: [], functions: [
                                 {
                                     fn: 'distinct', arguments: [
-                                        { pattern: '$', fields: ['"user_agent"'], functions: [] },
+                                        { pattern: '$', fields: ['user_agent'], functions: [] },
                                     ],
                                 },
                             ],
@@ -62,7 +62,7 @@ test('select, from, where (math)', () => {
         select: {
             star: false,
             expressions: [{
-                pattern: '$ * 100 / $', fields: ['"used"', '"total"'], functions: [],
+                pattern: '$ * 100 / $', fields: ['used', 'total'], functions: [],
             }],
         },
         from: { bucket: 'system' },
@@ -97,7 +97,7 @@ test('select, from, where, group', () => {
                 pattern: '#', fields: [], functions: [
                     {
                         fn: 'percentile', arguments: [
-                            { pattern: '$', fields: ['"response_time"'], functions: [] },
+                            { pattern: '$', fields: ['response_time'], functions: [] },
                             { pattern: '99', fields: [], functions: [] },
                         ],
                     },
@@ -127,7 +127,7 @@ test('select, from, group', () => {
                 pattern: '#', fields: [], functions: [
                     {
                         fn: 'last', arguments: [
-                            { pattern: '$', fields: ['"distance"'], functions: [] },
+                            { pattern: '$', fields: ['distance'], functions: [] },
                         ],
                     },
                 ],
@@ -148,7 +148,7 @@ test('select, from, fill', () => {
     expect(clauses).toEqual({
         select: {
             star: false,
-            expressions: [{ pattern: '$', fields: ['"a"'], functions: [] }],
+            expressions: [{ pattern: '$', fields: ['a'], functions: [] }],
         },
         from: { bucket: 'b' },
         fill: {
@@ -190,7 +190,7 @@ test('select, from, group, fill', () => {
     expect(clauses).toEqual({
         select: {
             star: false,
-            expressions: [{ pattern: '$ + 3', fields: ['"a"'], functions: [] }],
+            expressions: [{ pattern: '$ + 3', fields: ['a'], functions: [] }],
         },
         from: { bucket: 'b', measurement: 'x' },
         groupBy: {
@@ -215,12 +215,12 @@ test('select, from, where, fill', () => {
                     pattern: '#', fields: [], functions: [
                         {
                             fn: 'max', arguments: [
-                                { pattern: '$', fields: ['"a"'], functions: [] },
+                                { pattern: '$', fields: ['a'], functions: [] },
                             ],
                         },
                     ],
                 },
-                { pattern: '$', fields: ['"b"'], functions: [] },
+                { pattern: '$', fields: ['b'], functions: [] },
             ],
         },
         from: { bucket: 'c' },

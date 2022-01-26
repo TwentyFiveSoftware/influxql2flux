@@ -12,18 +12,21 @@ export const generatePipeline = (clauses: Clauses): Pipeline => {
         return pipeline;
 
 
+    const aggregationStages = splitAtFirstAggregationFunction(generateAggregationStages(clauses));
+
     pipeline.stages.push(...generateFromStage(clauses.from));
     pipeline.stages.push(...generateRangeStage(clauses.where));
     pipeline.stages.push(...generateFilterStages(clauses));
+    pipeline.stages.push(...generateGroupByStage(clauses.groupBy));
 
-    const aggregationStages = splitAtFirstAggregationFunction(generateAggregationStages(clauses));
     pipeline.stages.push(...aggregationStages.before);
     pipeline.stages.push(...generateTimeAggregationStage(clauses.groupBy, aggregationStages.fn));
+
     if (aggregationStages.fn?.fn)
         pipeline.stages.push(aggregationStages.fn);
+
     pipeline.stages.push(...aggregationStages.after);
 
-    pipeline.stages.push(...generateGroupByStage(clauses.groupBy));
     pipeline.stages.push(...generateFillStage(clauses.fill));
 
 

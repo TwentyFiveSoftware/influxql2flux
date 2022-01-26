@@ -217,6 +217,37 @@ test('group by multiple columns', () => {
     expect(generatePipeline(clauses).stages).toEqual(stages);
 });
 
+test('group by one column and aggregate', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [
+                {
+                    pattern: '#', fields: [], functions: [{
+                        fn: 'mean', arguments: [
+                            { pattern: '$', fields: ['requests'], functions: [] },
+                        ],
+                    }],
+                },
+            ],
+        },
+        from: { bucket: 'system' },
+        groupBy: {
+            star: false,
+            columns: ['"instance"'],
+        },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"system"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "requests"' } },
+        { fn: 'group', arguments: { columns: '["instance"]', mode: '"by"' } },
+        { fn: 'mean', arguments: {} },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
 test('group by time', () => {
     const clauses: Clauses = {
         select: {
@@ -264,8 +295,8 @@ test('where and group by time and columns', () => {
         { fn: 'range', arguments: { start: 'now()' } },
         { fn: 'filter', arguments: { fn: '(r) => r._field == "a"' } },
         { fn: 'filter', arguments: { fn: '(r) => r.host !~ /^eu-[0-9]+/' } },
-        { fn: 'aggregateWindow', arguments: { every: '1mo' } },
         { fn: 'group', arguments: { columns: '["xxx", "host", "c"]', mode: '"by"' } },
+        { fn: 'aggregateWindow', arguments: { every: '1mo' } },
     ];
 
     expect(generatePipeline(clauses).stages).toEqual(stages);
@@ -491,9 +522,9 @@ test('nested aggregation functions with time aggregation', () => {
     const stages: PipelineStage[] = [
         { fn: 'from', arguments: { bucket: '"system"' } },
         { fn: 'filter', arguments: { fn: '(r) => r._field == "requests"' } },
+        { fn: 'group', arguments: { columns: '["host", "user_agent"]', mode: '"by"' } },
         { fn: 'aggregateWindow', arguments: { every: '10s', fn: 'last' } },
         { fn: 'derivative', arguments: { unit: '1s', nonNegative: 'true' } },
-        { fn: 'group', arguments: { columns: '["host", "user_agent"]', mode: '"by"' } },
     ];
     expect(generatePipeline(clauses).stages).toEqual(stages);
 });
@@ -569,11 +600,11 @@ test('percentile and percentage calculation', () => {
     const stages: PipelineStage[] = [
         { fn: 'from', arguments: { bucket: '"system"' } },
         { fn: 'filter', arguments: { fn: '(r) => r._field == "memory total" or r._field == "memory_usage"' } },
+        { fn: 'group', arguments: { columns: '["host"]', mode: '"by"' } },
         { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r._value * 0.5 })' } },
         { fn: 'aggregateWindow', arguments: { every: '10s', fn: [{ fn: 'quantile', arguments: { q: '0.975' } }] } },
         { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
         { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r._value * 100 / r["memory total"] })' } },
-        { fn: 'group', arguments: { columns: '["host"]', mode: '"by"' } },
     ];
     expect(generatePipeline(clauses).stages).toEqual(stages);
 });
@@ -616,13 +647,13 @@ test('math before first aggregation', () => {
     const stages: PipelineStage[] = [
         { fn: 'from', arguments: { bucket: '"system"' } },
         { fn: 'filter', arguments: { fn: '(r) => r._field == "a" or r._field == "b" or r._field == "requests" or r._field == "data center"' } },
+        { fn: 'group', arguments: { columns: '["host"]', mode: '"by"' } },
         { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
         { fn: 'map', arguments: { fn: '(r) => ({ r with _value: (r.requests - 10) / 29 + (r["data center"] | 3) })' } },
         { fn: 'aggregateWindow', arguments: { every: '5.5h', fn: 'sum' } },
         { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r._value / 2 + (r.a ^ r.b) })' } },
         { fn: 'integral', arguments: { unit: '1.5m' } },
         { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r._value / 100 })' } },
-        { fn: 'group', arguments: { columns: '["host"]', mode: '"by"' } },
     ];
     expect(generatePipeline(clauses).stages).toEqual(stages);
 });
