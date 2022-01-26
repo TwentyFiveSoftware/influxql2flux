@@ -3,6 +3,7 @@ import type { Clauses } from '../clauses/types';
 import type { SelectClause } from '../clauses/types';
 import type { WhereClause } from '../clauses/types';
 import { removeUnnecessaryOuterBrackets } from '../clauses/utility/removeUnnecessaryOuterBrackets';
+import { FillClause, FromClause, GroupByClause } from '../clauses/types';
 
 export const generatePipeline = (clauses: Clauses): Pipeline => {
     const pipeline: Pipeline = {
@@ -12,26 +13,84 @@ export const generatePipeline = (clauses: Clauses): Pipeline => {
     if (!clauses.select || !clauses.from)
         return pipeline;
 
+    pipeline.stages.push(...generateFromStage(clauses.from));
+    pipeline.stages.push(...generateRangeStage(clauses.where));
+    pipeline.stages.push(...generateFilterStages(clauses));
+    pipeline.stages.push(...generateTimeAggregationStage(clauses.groupBy));
+    pipeline.stages.push(...generateGroupByStage(clauses.groupBy));
+    pipeline.stages.push(...generateFillStage(clauses.fill));
 
-    const bucket = `"${clauses.from.bucket}${clauses.from.retention ? `/${clauses.from.retention}` : ''}"`;
-    pipeline.stages.push({ fn: 'from', arguments: { bucket } });
+    return pipeline;
+};
+
+const generateFromStage = (fromClause?: FromClause.Clause): PipelineStage[] => {
+    if (!fromClause)
+        return [];
+
+    const bucket = `"${fromClause.bucket}${fromClause.retention ? `/${fromClause.retention}` : ''}"`;
+    return [{ fn: 'from', arguments: { bucket } }];
+};
+
+const generateRangeStage = (whereClause?: WhereClause.Clause): PipelineStage[] => {
+    if (!whereClause || whereClause.timeFilters.length === 0)
+        return [];
+
+    let rangeStage: PipelineStage = { fn: 'range', arguments: {} };
+
+    for (const filter of whereClause.timeFilters)
+        if (filter.operator === '>' || filter.operator === '>=')
+            rangeStage.arguments.start = filter.value;
+        else if (filter.operator === '<' || filter.operator === '<=')
+            rangeStage.arguments.stop = filter.value;
+
+    if (!('start' in rangeStage.arguments || 'stop' in rangeStage.arguments))
+        return [];
+
+    return [rangeStage];
+};
+
+const generateFilterStages = (clauses: Clauses): PipelineStage[] => {
+    const getUsedFields = (expressions: SelectClause.Expression[]): string[] => {
+        const fields: string[] = [];
+
+        for (const expression of expressions) {
+            fields.push(...expression.fields);
+
+            for (const fn of expression.functions)
+                fields.push(...getUsedFields(fn.arguments));
+        }
+
+        return Array.from(new Set(fields));
+    };
+
+    const generateFilterStage = (variable: WhereClause.Condition | WhereClause.Filter): string => {
+        const generateFilterFunction = (variable: WhereClause.Condition | WhereClause.Filter): string => {
+            if ('type' in variable)
+                return '(' + variable.variables.map(generateFilterFunction).join(` ${variable.type} `) + ')';
+
+            let pattern = variable.fieldsPattern ?? '$';
+            for (let field of variable.fields) {
+                field = field === 'time' ? '_time' : field;
+                pattern = pattern.replace('$',
+                    field.startsWith('"') ? `r[${field}]` : `r.${field}`);
+            }
+
+            return `${pattern} ${variable.operator} ${variable.value}`;
+        };
+
+        return '(r) => ' + removeUnnecessaryOuterBrackets(generateFilterFunction(variable));
+    };
 
 
     const filterStages: string[] = [];
 
-    if (clauses.from.measurement)
+    if (clauses.from?.measurement)
         filterStages.push(`(r) => r._measurement == "${clauses.from.measurement}"`);
 
-
-    const usedFields: string[] = clauses.select.star ? [] : getUsedFields(clauses.select.expressions);
-    if (usedFields.length > 0)
-        filterStages.push('(r) => ' + usedFields.map(field => `r._field == ${field}`).join(' or '));
-
-
-    if (clauses.where && clauses.where.timeFilters.length > 0) {
-        const rangeStage = generateRangeStage(clauses.where.timeFilters);
-        if (rangeStage)
-            pipeline.stages.push(rangeStage);
+    if (clauses.select) {
+        const usedFields: string[] = clauses.select.star ? [] : getUsedFields(clauses.select.expressions);
+        if (usedFields.length > 0)
+            filterStages.push('(r) => ' + usedFields.map(field => `r._field == ${field}`).join(' or '));
     }
 
     if (clauses.where && clauses.where.filters) {
@@ -43,84 +102,43 @@ export const generatePipeline = (clauses: Clauses): Pipeline => {
             filterStages.push(generateFilterStage(clauses.where.filters));
     }
 
-    pipeline.stages.push(...filterStages.map(fn => ({ fn: 'filter', arguments: { fn } })));
-
-
-    if (clauses.groupBy) {
-        if (clauses.groupBy.timeInterval) {
-            pipeline.stages.push({
-                fn: 'aggregateWindow',
-                arguments: {
-                    every: clauses.groupBy.timeInterval,
-                    fn: 'mean',
-                },
-            });
-        }
-
-        if (clauses.groupBy.columns.length > 0) {
-            pipeline.stages.push({
-                fn: 'group',
-                arguments: {
-                    columns: `[${clauses.groupBy.columns.join(', ')}]`,
-                    mode: '"by"',
-                },
-            });
-        }
-    }
-
-
-    if (clauses.fill && (clauses.fill.usePrevious || clauses.fill.value.length > 0)) {
-        pipeline.stages.push({
-            fn: 'fill',
-            arguments: clauses.fill.usePrevious ? { usePrevious: 'true' } : { value: clauses.fill.value },
-        });
-    }
-
-
-    return pipeline;
+    return filterStages.map(fn => ({ fn: 'filter', arguments: { fn } }));
 };
 
-const getUsedFields = (expressions: SelectClause.Expression[]): string[] => {
-    const fields: string[] = [];
+const generateGroupByStage = (groupByClause?: GroupByClause.Clause): PipelineStage[] => {
+    if (!groupByClause || groupByClause.columns.length === 0)
+        return [];
 
-    for (const expression of expressions) {
-        fields.push(...expression.fields);
-
-        for (const fn of expression.functions)
-            fields.push(...getUsedFields(fn.arguments));
-    }
-
-    return Array.from(new Set(fields));
+    return [{
+        fn: 'group',
+        arguments: {
+            columns: `[${groupByClause.columns.join(', ')}]`,
+            mode: '"by"',
+        },
+    }];
 };
 
-const generateFilterStage = (variable: WhereClause.Condition | WhereClause.Filter): string => {
-    const generateFilterFunction = (variable: WhereClause.Condition | WhereClause.Filter): string => {
-        if ('type' in variable)
-            return '(' + variable.variables.map(generateFilterFunction).join(` ${variable.type} `) + ')';
+const generateTimeAggregationStage = (groupByClause?: GroupByClause.Clause): PipelineStage[] => {
+    if (!groupByClause || !groupByClause.timeInterval)
+        return [];
 
-        let pattern = variable.fieldsPattern ?? '$';
-        for (let field of variable.fields) {
-            field = field === 'time' ? '_time' : field;
-            pattern = pattern.replace('$', field.startsWith('"') ? `r[${field}]` : `r.${field}`);
-        }
-
-        return `${pattern} ${variable.operator} ${variable.value}`;
-    };
-
-    return '(r) => ' + removeUnnecessaryOuterBrackets(generateFilterFunction(variable));
+    return [{
+        fn: 'aggregateWindow',
+        arguments: {
+            every: groupByClause.timeInterval,
+            fn: 'mean',
+        },
+    }];
 };
 
-const generateRangeStage = (timeFilters: WhereClause.Filter[]): PipelineStage | null => {
-    let rangeStage: PipelineStage = { fn: 'range', arguments: {} };
+const generateFillStage = (fillClause?: FillClause.Clause): PipelineStage[] => {
+    if (!fillClause || (!fillClause.usePrevious && fillClause.value.length === 0))
+        return [];
 
-    for (const filter of timeFilters)
-        if (filter.operator === '>' || filter.operator === '>=')
-            rangeStage.arguments.start = filter.value;
-        else if (filter.operator === '<' || filter.operator === '<=')
-            rangeStage.arguments.stop = filter.value;
-
-    if (!('start' in rangeStage.arguments || 'stop' in rangeStage.arguments))
-        return null;
-
-    return rangeStage;
+    return [{
+        fn: 'fill',
+        arguments: fillClause.usePrevious
+            ? { usePrevious: 'true' }
+            : { value: fillClause.value },
+    }];
 };
