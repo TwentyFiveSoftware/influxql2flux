@@ -55,6 +55,13 @@ test('regex (!~)', () => {
     expect(whereClause.filters).toEqual(expected);
 });
 
+test('boolean as value', () => {
+    const whereClause = parseWhereClause(`a ^ 25 = true`);
+    const expected: WhereClause.Filter =
+        { fields: ['a'], fieldsPattern: '$ ^ 25', operator: '==', value: 'true' };
+    expect(whereClause.filters).toEqual(expected);
+});
+
 test('multiple conditions (and) 1', () => {
     const whereClause = parseWhereClause(`'user agent' = 'Chrome' and region <> "Northern America"`);
     const expected: WhereClause.Condition = {

@@ -9,7 +9,7 @@ const SyntaxHighlighting = ({ code }: Props) => {
     const lines = code.split('\n')
         .filter(line => line.trim().length > 0)
         .map(line => {
-            const tokens: { color: string, text: string, index: number }[] = [];
+            let tokens: { color: string, text: string, index: number }[] = [];
 
             for (const fn of line.matchAll(/([a-z]+)\(/gi))
                 tokens.push({ color: '#61AFEF', text: fn[1] ?? '', index: fn.index ?? 0 });
@@ -39,6 +39,11 @@ const SyntaxHighlighting = ({ code }: Props) => {
 
             for (const fn of line.matchAll(/ (>) | (<) | ([+*\\|%^&-]) /gi))
                 tokens.push({ color: '#C678DD', text: fn[1] ?? fn[2] ?? fn[3] ?? '', index: (fn.index ?? 0) + 1 });
+
+
+            // remove "double colored" tokens (e.g "true" and true)
+            tokens = tokens.filter(token => !tokens.filter(t => t !== token)
+                .some(t => t.index <= token.index && t.index + t.text.length >= token.index + token.text.length));
 
 
             const sortedTokens = tokens.sort((a, b) => a.index - b.index);

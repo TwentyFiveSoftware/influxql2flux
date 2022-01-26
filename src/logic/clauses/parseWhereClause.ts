@@ -96,8 +96,12 @@ const formatValue = (influxQL: string, operator: string): string => {
     if (!value.match(REGEX_NUMBER) &&
         !value.match(REGEX_TIMESTAMP) &&
         !(operator === '=~' || operator === '!~') &&
-        !value.includes('now()'))
+        !value.includes('now()') &&
+        value !== 'true' &&
+        value !== 'false') {
+
         value = `"${value}"`;
+    }
 
     return value;
 };
