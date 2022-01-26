@@ -47,7 +47,7 @@ const parseExpression = (influxQL: string): SelectClause.Expression => {
 
         field = field.toLowerCase() === 'time' ? '_time' : field;
 
-        fields.push(`"${field}"`);
+        fields.push(field.includes(' ') ? `"${field}"` : field);
         pattern = pattern.replace(fieldMatch[0], '$');
     }
 

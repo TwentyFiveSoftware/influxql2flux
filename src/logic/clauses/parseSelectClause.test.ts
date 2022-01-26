@@ -16,7 +16,7 @@ test('star', () => {
 test('one field', () => {
     const selectClause = parseSelectClause(`"total_memory"`);
     const expressions: SelectClause.Expression[] = [
-        { pattern: '$', fields: ['"total_memory"'], functions: [] },
+        { pattern: '$', fields: ['total_memory'], functions: [] },
     ];
     expect(selectClause.star).toBe(false);
     expect(selectClause.expressions).toEqual(expressions);
@@ -25,7 +25,7 @@ test('one field', () => {
 test('two fields', () => {
     const selectClause = parseSelectClause(`"total_memory", 'cpu usage'`);
     const expressions: SelectClause.Expression[] = [
-        { pattern: '$', fields: ['"total_memory"'], functions: [] },
+        { pattern: '$', fields: ['total_memory'], functions: [] },
         { pattern: '$', fields: ['"cpu usage"'], functions: [] },
     ];
     expect(selectClause.star).toBe(false);
@@ -35,8 +35,8 @@ test('two fields', () => {
 test('three fields', () => {
     const selectClause = parseSelectClause(`"total_memory", disk, 'cpu usage'`);
     const expressions: SelectClause.Expression[] = [
-        { pattern: '$', fields: ['"total_memory"'], functions: [] },
-        { pattern: '$', fields: ['"disk"'], functions: [] },
+        { pattern: '$', fields: ['total_memory'], functions: [] },
+        { pattern: '$', fields: ['disk'], functions: [] },
         { pattern: '$', fields: ['"cpu usage"'], functions: [] },
     ];
     expect(selectClause.star).toBe(false);
@@ -46,7 +46,7 @@ test('three fields', () => {
 test('time field', () => {
     const selectClause = parseSelectClause(`"time"`);
     const expressions: SelectClause.Expression[] = [
-        { pattern: '$', fields: ['"_time"'], functions: [] },
+        { pattern: '$', fields: ['_time'], functions: [] },
     ];
     expect(selectClause.star).toBe(false);
     expect(selectClause.expressions).toEqual(expressions);
@@ -74,7 +74,7 @@ test('top', () => {
         {
             pattern: '#', fields: [], functions: [{
                 fn: 'top', arguments: [
-                    { pattern: '$', fields: ['"request"'], functions: [] },
+                    { pattern: '$', fields: ['request'], functions: [] },
                     { pattern: '20', fields: [], functions: [] },
                 ],
             }],
@@ -94,7 +94,7 @@ test('count + distinct', () => {
                         pattern: '#', fields: [], functions: [
                             {
                                 fn: 'distinct', arguments: [
-                                    { pattern: '$', fields: ['"cpu_usage"'], functions: [] },
+                                    { pattern: '$', fields: ['cpu_usage'], functions: [] },
                                 ],
                             },
                         ],
@@ -113,7 +113,7 @@ test('percentile (90)', () => {
         {
             pattern: '#', fields: [], functions: [{
                 fn: 'percentile', arguments: [
-                    { pattern: '$', fields: ['"cpu_usage"'], functions: [] },
+                    { pattern: '$', fields: ['cpu_usage'], functions: [] },
                     { pattern: '90', fields: [], functions: [] },
                 ],
             }],
@@ -129,7 +129,7 @@ test('percentile (99.9)', () => {
         {
             pattern: '#', fields: [], functions: [{
                 fn: 'percentile', arguments: [
-                    { pattern: '$', fields: ['"response_time"'], functions: [] },
+                    { pattern: '$', fields: ['response_time'], functions: [] },
                     { pattern: '99.9', fields: [], functions: [] },
                 ],
             }],
@@ -147,7 +147,7 @@ test.each([
     const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
-                fn: fn, arguments: [{ pattern: '$', fields: ['"field"'], functions: [] }],
+                fn: fn, arguments: [{ pattern: '$', fields: ['field'], functions: [] }],
             }],
         },
     ];
@@ -162,7 +162,7 @@ test.each([
     const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
-                fn: fn, arguments: [{ pattern: '$', fields: ['"field"'], functions: [] }],
+                fn: fn, arguments: [{ pattern: '$', fields: ['field'], functions: [] }],
             }],
         },
     ];
@@ -179,7 +179,7 @@ test.each([
     const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
-                fn: fn, arguments: [{ pattern: '$', fields: ['"field"'], functions: [] }],
+                fn: fn, arguments: [{ pattern: '$', fields: ['field'], functions: [] }],
             }],
         },
     ];
@@ -195,7 +195,7 @@ test.each([
         {
             pattern: '#', fields: [], functions: [{
                 fn: fn, arguments: [
-                    { pattern: '$', fields: ['"field"'], functions: [] },
+                    { pattern: '$', fields: ['field'], functions: [] },
                     { pattern: '5', fields: [], functions: [] },
                 ],
             }],
@@ -211,8 +211,8 @@ test('transform: atan2', () => {
         {
             pattern: '#', fields: [], functions: [{
                 fn: 'atan2', arguments: [
-                    { pattern: '$', fields: ['"altitude"'], functions: [] },
-                    { pattern: '$', fields: ['"distance"'], functions: [] },
+                    { pattern: '$', fields: ['altitude'], functions: [] },
+                    { pattern: '$', fields: ['distance'], functions: [] },
                 ],
             }],
         },
@@ -227,7 +227,7 @@ test('transform: derivative', () => {
         {
             pattern: '#', fields: [], functions: [{
                 fn: 'derivative', arguments: [
-                    { pattern: '$', fields: ['"field"'], functions: [] },
+                    { pattern: '$', fields: ['field'], functions: [] },
                     { pattern: '1.5m', fields: [], functions: [] },
                 ],
             }],
@@ -243,7 +243,7 @@ test('transform: non_negative_derivative', () => {
         {
             pattern: '#', fields: [], functions: [{
                 fn: 'non_negative_derivative', arguments: [
-                    { pattern: '$', fields: ['"field"'], functions: [] },
+                    { pattern: '$', fields: ['field'], functions: [] },
                     { pattern: '2s', fields: [], functions: [] },
                 ],
             }],
@@ -256,7 +256,7 @@ test('transform: non_negative_derivative', () => {
 test('math: 1', () => {
     const selectClause = parseSelectClause(`((  (("A" * "B"))))`);
     const expressions: SelectClause.Expression[] = [
-        { pattern: '$ * $', fields: ['"A"', '"B"'], functions: [] },
+        { pattern: '$ * $', fields: ['A', 'B'], functions: [] },
     ];
     expect(selectClause.star).toBe(false);
     expect(selectClause.expressions).toEqual(expressions);
@@ -265,7 +265,7 @@ test('math: 1', () => {
 test('math: 2', () => {
     const selectClause = parseSelectClause(`C - 3 + "A" % ("B" + 1)`);
     const expressions: SelectClause.Expression[] = [
-        { pattern: '$ - 3 + $ % ($ + 1)', fields: ['"C"', '"A"', '"B"'], functions: [] },
+        { pattern: '$ - 3 + $ % ($ + 1)', fields: ['C', 'A', 'B'], functions: [] },
     ];
     expect(selectClause.star).toBe(false);
     expect(selectClause.expressions).toEqual(expressions);
@@ -274,7 +274,7 @@ test('math: 2', () => {
 test('math: 3', () => {
     const selectClause = parseSelectClause(`"A" ^ true`);
     const expressions: SelectClause.Expression[] = [
-        { pattern: '$ ^ true', fields: ['"A"'], functions: [] },
+        { pattern: '$ ^ true', fields: ['A'], functions: [] },
     ];
     expect(selectClause.star).toBe(false);
     expect(selectClause.expressions).toEqual(expressions);
@@ -283,8 +283,8 @@ test('math: 3', () => {
 test('math: 4', () => {
     const selectClause = parseSelectClause(`A - 5, 2 * "B"`);
     const expressions: SelectClause.Expression[] = [
-        { pattern: '$ - 5', fields: ['"A"'], functions: [] },
-        { pattern: '2 * $', fields: ['"B"'], functions: [] },
+        { pattern: '$ - 5', fields: ['A'], functions: [] },
+        { pattern: '2 * $', fields: ['B'], functions: [] },
     ];
     expect(selectClause.star).toBe(false);
     expect(selectClause.expressions).toEqual(expressions);
@@ -304,8 +304,8 @@ test('math: 5', () => {
                         {
                             pattern: '($) * 100 + $',
                             fields: [
-                                '"used"',
-                                '"A"',
+                                'used',
+                                'A',
                             ],
                             functions: [],
                         },
@@ -324,7 +324,7 @@ test('math: 5', () => {
                                         {
                                             pattern: '$',
                                             fields: [
-                                                '"total"',
+                                                'total',
                                             ],
                                             functions: [],
                                         },
