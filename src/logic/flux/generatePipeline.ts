@@ -46,6 +46,37 @@ export const generatePipeline = (clauses: Clauses): Pipeline => {
     pipeline.stages.push(...filterStages.map(fn => ({ fn: 'filter', arguments: { fn } })));
 
 
+    if (clauses.groupBy) {
+        if (clauses.groupBy.timeInterval) {
+            pipeline.stages.push({
+                fn: 'aggregateWindow',
+                arguments: {
+                    every: clauses.groupBy.timeInterval,
+                    fn: 'mean',
+                },
+            });
+        }
+
+        if (clauses.groupBy.columns.length > 0) {
+            pipeline.stages.push({
+                fn: 'group',
+                arguments: {
+                    columns: `[${clauses.groupBy.columns.join(', ')}]`,
+                    mode: '"by"',
+                },
+            });
+        }
+    }
+
+
+    if (clauses.fill && (clauses.fill.usePrevious || clauses.fill.value.length > 0)) {
+        pipeline.stages.push({
+            fn: 'fill',
+            arguments: clauses.fill.usePrevious ? { usePrevious: 'true' } : { value: clauses.fill.value },
+        });
+    }
+
+
     return pipeline;
 };
 

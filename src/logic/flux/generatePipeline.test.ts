@@ -174,3 +174,194 @@ test('range (nested time filter)', () => {
 
     expect(generatePipeline(clauses).stages).toEqual(stages);
 });
+
+test('group by one column', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [],
+        },
+        from: { bucket: 'b' },
+        groupBy: {
+            star: false,
+            columns: ['"user agent"'],
+        },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"b"' } },
+        { fn: 'group', arguments: { columns: '["user agent"]', mode: '"by"' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('group by multiple columns', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [],
+        },
+        from: { bucket: 'b' },
+        groupBy: {
+            star: false,
+            columns: ['"user agent"', '"host"'],
+        },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"b"' } },
+        { fn: 'group', arguments: { columns: '["user agent", "host"]', mode: '"by"' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('group by time', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [],
+        },
+        from: { bucket: 'b' },
+        groupBy: {
+            star: false,
+            columns: [],
+            timeInterval: '30s',
+        },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"b"' } },
+        { fn: 'aggregateWindow', arguments: { every: '30s', fn: 'mean' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('where and group by time and columns', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [
+                { pattern: '$', fields: ['"a"'], functions: [] },
+            ],
+        },
+        from: { bucket: 'b' },
+        where: {
+            filters: { fields: ['host'], operator: '!~', value: '/^eu-[0-9]+/' },
+            timeFilters: [{ fields: ['_time'], operator: '>', value: 'now()' }],
+        },
+        groupBy: {
+            star: false,
+            columns: ['"xxx"', '"host"', '"c"'],
+            timeInterval: '1mo',
+        },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"b"' } },
+        { fn: 'range', arguments: { start: 'now()' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "a"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r.host !~ /^eu-[0-9]+/' } },
+        { fn: 'aggregateWindow', arguments: { every: '1mo', fn: 'mean' } },
+        { fn: 'group', arguments: { columns: '["xxx", "host", "c"]', mode: '"by"' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('fill value', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [],
+        },
+        from: { bucket: 'b' },
+        fill: {
+            usePrevious: false,
+            value: '1.5',
+        },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"b"' } },
+        { fn: 'fill', arguments: { value: '1.5' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('fill previous', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [],
+        },
+        from: { bucket: 'b' },
+        fill: {
+            usePrevious: true,
+            value: '',
+        },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"b"' } },
+        { fn: 'fill', arguments: { usePrevious: 'true' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('fill with no value', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [],
+        },
+        from: { bucket: 'b' },
+        fill: {
+            usePrevious: false,
+            value: '',
+        },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"b"' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('group and fill', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [
+                { pattern: '$', fields: ['"a"'], functions: [] },
+            ],
+        },
+        from: { bucket: 'b' },
+        where: {
+            timeFilters: [{ fields: ['_time'], operator: '>', value: 'now()' }],
+        },
+        groupBy: {
+            star: false,
+            columns: ['"host"'],
+        },
+        fill: {
+            usePrevious: false,
+            value: '12',
+        },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"b"' } },
+        { fn: 'range', arguments: { start: 'now()' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "a"' } },
+        { fn: 'group', arguments: { columns: '["host"]', mode: '"by"' } },
+        { fn: 'fill', arguments: { value: '12' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
