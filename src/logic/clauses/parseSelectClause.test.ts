@@ -69,11 +69,11 @@ test('bottom', () => {
 });
 
 test('top', () => {
-    const selectClause = parseSelectClause(`max("request" ,  20  )`);
+    const selectClause = parseSelectClause(`top("request" ,  20  )`);
     const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
-                fn: 'max', arguments: [
+                fn: 'top', arguments: [
                     { pattern: '$', fields: ['"request"'], functions: [] },
                     { pattern: '20', fields: [], functions: [] },
                 ],

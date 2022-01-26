@@ -11,7 +11,7 @@ test('simple test', () => {
         select: {
             star: false,
             expressions: [
-                { pattern: '$', fields: ['"ram_usage"'], functions: [] },
+                { pattern: '$', fields: ['ram_usage'], functions: [] },
             ],
         },
         from: { bucket: 'system' },
@@ -30,8 +30,8 @@ test('basic filter test', () => {
         select: {
             star: false,
             expressions: [
-                { pattern: '$', fields: ['"cpu"'], functions: [] },
-                { pattern: '$', fields: ['"ram"'], functions: [] },
+                { pattern: '$', fields: ['cpu'], functions: [] },
+                { pattern: '$', fields: ['ram'], functions: [] },
             ],
         },
         from: { bucket: 'system', retention: 'autogen' },
@@ -61,7 +61,7 @@ test('complex filter test', () => {
         select: {
             star: false,
             expressions: [
-                { pattern: '$', fields: ['"cpu"'], functions: [] },
+                { pattern: '$', fields: ['cpu'], functions: [] },
             ],
         },
         from: { bucket: 'system', retention: 'autogen' },
@@ -102,7 +102,7 @@ test('range (start only)', () => {
         select: {
             star: false,
             expressions: [
-                { pattern: '$', fields: ['"usage"'], functions: [] },
+                { pattern: '$', fields: ['usage'], functions: [] },
             ],
         },
         from: { bucket: 'system', measurement: 'cpu' },
@@ -126,7 +126,7 @@ test('range (stop only)', () => {
         select: {
             star: false,
             expressions: [
-                { pattern: '$', fields: ['"usage"'], functions: [] },
+                { pattern: '$', fields: ['usage'], functions: [] },
             ],
         },
         from: { bucket: 'system', measurement: 'cpu' },
@@ -150,7 +150,7 @@ test('range (nested time filter)', () => {
         select: {
             star: false,
             expressions: [
-                { pattern: '$', fields: ['"a"'], functions: [] },
+                { pattern: '$', fields: ['a'], functions: [] },
             ],
         },
         from: { bucket: 'b' },
@@ -233,7 +233,7 @@ test('group by time', () => {
 
     const stages: PipelineStage[] = [
         { fn: 'from', arguments: { bucket: '"b"' } },
-        { fn: 'aggregateWindow', arguments: { every: '30s', fn: 'mean' } },
+        { fn: 'aggregateWindow', arguments: { every: '30s' } },
     ];
 
     expect(generatePipeline(clauses).stages).toEqual(stages);
@@ -244,7 +244,7 @@ test('where and group by time and columns', () => {
         select: {
             star: false,
             expressions: [
-                { pattern: '$', fields: ['"a"'], functions: [] },
+                { pattern: '$', fields: ['a'], functions: [] },
             ],
         },
         from: { bucket: 'b' },
@@ -264,7 +264,7 @@ test('where and group by time and columns', () => {
         { fn: 'range', arguments: { start: 'now()' } },
         { fn: 'filter', arguments: { fn: '(r) => r._field == "a"' } },
         { fn: 'filter', arguments: { fn: '(r) => r.host !~ /^eu-[0-9]+/' } },
-        { fn: 'aggregateWindow', arguments: { every: '1mo', fn: 'mean' } },
+        { fn: 'aggregateWindow', arguments: { every: '1mo' } },
         { fn: 'group', arguments: { columns: '["xxx", "host", "c"]', mode: '"by"' } },
     ];
 
@@ -338,7 +338,7 @@ test('group and fill', () => {
         select: {
             star: false,
             expressions: [
-                { pattern: '$', fields: ['"a"'], functions: [] },
+                { pattern: '$', fields: ['a'], functions: [] },
             ],
         },
         from: { bucket: 'b' },
@@ -363,5 +363,271 @@ test('group and fill', () => {
         { fn: 'fill', arguments: { value: '12' } },
     ];
 
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('one aggregation function', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [
+                {
+                    pattern: '#', fields: [], functions: [{
+                        fn: 'top', arguments: [
+                            { pattern: '$', fields: ['requests'], functions: [] },
+                            { pattern: '20', fields: [], functions: [] },
+                        ],
+                    }],
+                },
+            ],
+        },
+        from: { bucket: 'system' },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"system"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "requests"' } },
+        { fn: 'top', arguments: { n: '20' } },
+    ];
+
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('one aggregation function with time grouping', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [
+                {
+                    pattern: '#', fields: [], functions: [{
+                        fn: 'mean', arguments: [
+                            { pattern: '$', fields: ['"response time"'], functions: [] },
+                        ],
+                    }],
+                },
+            ],
+        },
+        from: { bucket: 'b' },
+        groupBy: {
+            star: false,
+            columns: [],
+            timeInterval: '30s',
+        },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"b"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "response time"' } },
+        { fn: 'aggregateWindow', arguments: { every: '30s', fn: 'mean' } },
+    ];
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('nested functions (no math)', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [
+                {
+                    pattern: '#', fields: [], functions: [{
+                        fn: 'count', arguments: [
+                            {
+                                pattern: '#', fields: [], functions: [
+                                    {
+                                        fn: 'distinct', arguments: [
+                                            { pattern: '$', fields: ['cpu_usage'], functions: [] },
+                                        ],
+                                    },
+                                ],
+                            },
+                        ],
+                    }],
+                },
+            ],
+        },
+        from: { bucket: 'system' },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"system"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "cpu_usage"' } },
+        { fn: 'distinct', arguments: {} },
+        { fn: 'count', arguments: {} },
+    ];
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('nested aggregation functions with time aggregation', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [
+                {
+                    pattern: '#', fields: [], functions: [{
+                        fn: 'non_negative_derivative', arguments: [
+                            {
+                                pattern: '#', fields: [], functions: [
+                                    {
+                                        fn: 'last', arguments: [
+                                            { pattern: '$', fields: ['requests'], functions: [] },
+                                        ],
+                                    },
+                                ],
+                            },
+                            { pattern: '1s', fields: [], functions: [] },
+                        ],
+                    }],
+                },
+            ],
+        },
+        from: { bucket: 'system' },
+        groupBy: {
+            star: false,
+            columns: ['"host"', '"user_agent"'],
+            timeInterval: '10s',
+        },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"system"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "requests"' } },
+        { fn: 'aggregateWindow', arguments: { every: '10s', fn: 'last' } },
+        { fn: 'derivative', arguments: { unit: '1s', nonNegative: 'true' } },
+        { fn: 'group', arguments: { columns: '["host", "user_agent"]', mode: '"by"' } },
+    ];
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('one field with math', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [
+                {
+                    pattern: '5 - ($ + 100) / 25.2', fields: ['a'], functions: [],
+                },
+            ],
+        },
+        from: { bucket: 'system' },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"system"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "a"' } },
+        { fn: 'map', arguments: { fn: '(r) => ({ r with _value: 5 - (r._value + 100) / 25.2 })' } },
+    ];
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('two fields with math', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [
+                {
+                    pattern: '$ / $', fields: ['a', 'b'], functions: [],
+                },
+            ],
+        },
+        from: { bucket: 'system' },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"system"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "a" or r._field == "b"' } },
+        { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
+        { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r.a / r.b })' } },
+    ];
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('percentile and percentage calculation', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [
+                {
+                    pattern: '# * 100 / $', fields: ['"memory total"'], functions: [
+                        {
+                            fn: 'percentile', arguments: [
+                                { pattern: '$ * 0.5', fields: ['memory_usage'], functions: [] },
+                                { pattern: '97.5', fields: [], functions: [] },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
+        from: { bucket: 'system' },
+        groupBy: {
+            star: false,
+            columns: ['"host"'],
+            timeInterval: '10s',
+        },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"system"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "memory total" or r._field == "memory_usage"' } },
+        { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r._value * 0.5 })' } },
+        { fn: 'aggregateWindow', arguments: { every: '10s', fn: [{ fn: 'quantile', arguments: { q: '0.975' } }] } },
+        { fn: 'duplicate', arguments: { column: '_value', as: '__temp' } },
+        { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
+        { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r.__temp * 100 / r["memory total"] })' } },
+        { fn: 'drop', arguments: { columns: '["__temp"]' } },
+        { fn: 'group', arguments: { columns: '["host"]', mode: '"by"' } },
+    ];
+    expect(generatePipeline(clauses).stages).toEqual(stages);
+});
+
+test('math before first aggregation', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [
+                {
+                    pattern: '# / 100', fields: [], functions: [{
+                        fn: 'integral', arguments: [
+                            {
+                                pattern: '# / 2 + ($ ^ $)', fields: ['a', 'b'], functions: [
+                                    {
+                                        fn: 'sum', arguments: [
+                                            {
+                                                pattern: '($ - 10) / 29 + ($ | 3)',
+                                                fields: ['requests', '"data center"'],
+                                                functions: [],
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                            { pattern: '1.5m', fields: [], functions: [] },
+                        ],
+                    }],
+                },
+            ],
+        },
+        from: { bucket: 'system' },
+        groupBy: {
+            star: false,
+            columns: ['"host"'],
+            timeInterval: '5.5h',
+        },
+    };
+
+    const stages: PipelineStage[] = [
+        { fn: 'from', arguments: { bucket: '"system"' } },
+        { fn: 'filter', arguments: { fn: '(r) => r._field == "a" or r._field == "b" or r._field == "requests" or r._field == "data center"' } },
+        { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
+        { fn: 'map', arguments: { fn: '(r) => ({ r with _value: (r.requests - 10) / 29 + (r["data center"] | 3) })' } },
+        { fn: 'aggregateWindow', arguments: { every: '5.5h', fn: 'sum' } },
+        { fn: 'duplicate', arguments: { column: '_value', as: '__temp' } },
+        { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
+        { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r.__temp / 2 + (r.a ^ r.b) })' } },
+        { fn: 'integral', arguments: { unit: '1.5m' } },
+        { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r._value / 100 })' } },
+        { fn: 'drop', arguments: { columns: '["__temp"]' } },
+        { fn: 'group', arguments: { columns: '["host"]', mode: '"by"' } },
+    ];
     expect(generatePipeline(clauses).stages).toEqual(stages);
 });

@@ -1,9 +1,7 @@
 import type { Pipeline, PipelineStage } from './types';
-import type { Clauses } from '../clauses/types';
-import type { SelectClause } from '../clauses/types';
-import type { WhereClause } from '../clauses/types';
+import { Clauses, SelectClause, WhereClause, FillClause, FromClause, GroupByClause } from '../clauses/types';
 import { removeUnnecessaryOuterBrackets } from '../clauses/utility/removeUnnecessaryOuterBrackets';
-import { FillClause, FromClause, GroupByClause } from '../clauses/types';
+import { fluxFunctionLookupTable } from './fluxFunctionLookupTable';
 
 export const generatePipeline = (clauses: Clauses): Pipeline => {
     const pipeline: Pipeline = {
@@ -13,12 +11,23 @@ export const generatePipeline = (clauses: Clauses): Pipeline => {
     if (!clauses.select || !clauses.from)
         return pipeline;
 
+
     pipeline.stages.push(...generateFromStage(clauses.from));
     pipeline.stages.push(...generateRangeStage(clauses.where));
     pipeline.stages.push(...generateFilterStages(clauses));
-    pipeline.stages.push(...generateTimeAggregationStage(clauses.groupBy));
+
+    const aggregationStages = splitAtFirstAggregationFunction(generateAggregationStages(clauses));
+    pipeline.stages.push(...aggregationStages.before);
+    pipeline.stages.push(...generateTimeAggregationStage(clauses.groupBy, aggregationStages.fn));
+    if (aggregationStages.fn?.fn)
+        pipeline.stages.push(aggregationStages.fn);
+    pipeline.stages.push(...aggregationStages.after);
+
     pipeline.stages.push(...generateGroupByStage(clauses.groupBy));
     pipeline.stages.push(...generateFillStage(clauses.fill));
+
+
+    pipeline.stages = pipeline.stages.filter(stage => stage.fn.length > 0);
 
     return pipeline;
 };
@@ -69,11 +78,9 @@ const generateFilterStages = (clauses: Clauses): PipelineStage[] => {
                 return '(' + variable.variables.map(generateFilterFunction).join(` ${variable.type} `) + ')';
 
             let pattern = variable.fieldsPattern ?? '$';
-            for (let field of variable.fields) {
-                field = field === 'time' ? '_time' : field;
+            for (const field of variable.fields)
                 pattern = pattern.replace('$',
                     field.startsWith('"') ? `r[${field}]` : `r.${field}`);
-            }
 
             return `${pattern} ${variable.operator} ${variable.value}`;
         };
@@ -90,7 +97,8 @@ const generateFilterStages = (clauses: Clauses): PipelineStage[] => {
     if (clauses.select) {
         const usedFields: string[] = clauses.select.star ? [] : getUsedFields(clauses.select.expressions);
         if (usedFields.length > 0)
-            filterStages.push('(r) => ' + usedFields.map(field => `r._field == ${field}`).join(' or '));
+            filterStages.push('(r) => ' + usedFields.map(field =>
+                `r._field == ${field.startsWith('"') ? field : `"${field}"`}`).join(' or '));
     }
 
     if (clauses.where && clauses.where.filters) {
@@ -118,17 +126,26 @@ const generateGroupByStage = (groupByClause?: GroupByClause.Clause): PipelineSta
     }];
 };
 
-const generateTimeAggregationStage = (groupByClause?: GroupByClause.Clause): PipelineStage[] => {
+const generateTimeAggregationStage = (groupByClause?: GroupByClause.Clause,
+                                      aggregationFunction?: PipelineStage): PipelineStage[] => {
+
     if (!groupByClause || !groupByClause.timeInterval)
         return [];
 
-    return [{
-        fn: 'aggregateWindow',
-        arguments: {
-            every: groupByClause.timeInterval,
-            fn: 'mean',
-        },
-    }];
+    let fn: string | PipelineStage[] = '';
+
+    if (aggregationFunction) {
+        fn = aggregationFunction.fn;
+
+        if (aggregationFunction && Object.keys(aggregationFunction?.arguments ?? []).length > 0)
+            fn = [{ fn: aggregationFunction.fn, arguments: aggregationFunction.arguments }];
+
+        aggregationFunction.fn = '';
+    }
+
+    return fn
+        ? [{ fn: 'aggregateWindow', arguments: { every: groupByClause.timeInterval, fn } }]
+        : [{ fn: 'aggregateWindow', arguments: { every: groupByClause.timeInterval } }];
 };
 
 const generateFillStage = (fillClause?: FillClause.Clause): PipelineStage[] => {
@@ -142,3 +159,83 @@ const generateFillStage = (fillClause?: FillClause.Clause): PipelineStage[] => {
             : { value: fillClause.value },
     }];
 };
+
+const generateAggregationStages = (clauses: Clauses): PipelineStage[] => {
+    let shouldDropTempField = false;
+
+    const linearizeExpression = (expression?: SelectClause.Expression): PipelineStage[] => {
+        const stages: PipelineStage[] = [];
+
+        if (!expression)
+            return stages;
+
+        if (expression.functions.length > 0) {
+            const fn = expression.functions[0];
+
+            stages.push(...linearizeExpression(fn.arguments.find(a => a.functions.length > 0 || a.fields.length > 0)));
+
+            stages.push(mapInfluxToFluxFunction(fn));
+        }
+
+        let pattern = expression.pattern;
+
+        if (expression.fields.length > 1 || (expression.fields.length >= 1 && expression.functions.length >= 1)) {
+            if (expression.functions.length >= 1) {
+                stages.push({ fn: 'duplicate', arguments: { column: '_value', as: '__temp' } });
+                shouldDropTempField = true;
+            }
+
+            stages.push({
+                fn: 'pivot',
+                arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' },
+            });
+
+            for (const field of expression.fields)
+                pattern = pattern.replace('$', field.startsWith('"') ? `r[${field}]` : `r.${field}`);
+
+            pattern = pattern.replaceAll('#', `r.__temp`);
+        }
+
+        if (pattern !== '$' && pattern !== '#') {
+            pattern = pattern.replace(/[$#]/g, 'r._value');
+
+            stages.push({
+                fn: 'map',
+                arguments: { fn: `(r) => ({ r with _value: ${pattern} })` },
+            });
+        }
+
+        return stages;
+    };
+
+    if (!clauses.select || clauses.select.star || clauses.select.expressions.length !== 1)
+        return [];
+
+
+    const stages = linearizeExpression(clauses.select.expressions[0]);
+
+    if (shouldDropTempField)
+        stages.push({ fn: 'drop', arguments: { columns: '["__temp"]' } });
+
+    return stages;
+};
+
+const splitAtFirstAggregationFunction = (stages: PipelineStage[]):
+    { before: PipelineStage[], fn?: PipelineStage, after: PipelineStage[] } => {
+
+    const index = stages.findIndex(stage => stage.fn !== 'map' && stage.fn !== 'pivot');
+
+    if (index === -1)
+        return { before: [], after: stages };
+
+    return { before: stages.slice(0, index), fn: stages[index], after: stages.slice(index + 1) };
+};
+
+const mapInfluxToFluxFunction = (fn: SelectClause.Fn): PipelineStage => {
+    const influxFnName = fn.fn.toLowerCase();
+    const args = fn.arguments.filter(a => a.fields.length === 0 && a.functions.length === 0).map(a => a.pattern);
+
+    const fluxFn = fluxFunctionLookupTable[influxFnName];
+    return { fn: fluxFn?.fluxFnName ?? '_', arguments: fluxFn?.argsMapping ? fluxFn.argsMapping(args) : {} };
+};
+
