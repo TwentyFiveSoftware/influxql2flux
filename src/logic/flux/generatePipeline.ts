@@ -161,8 +161,6 @@ const generateFillStage = (fillClause?: FillClause.Clause): PipelineStage[] => {
 };
 
 const generateAggregationStages = (clauses: Clauses): PipelineStage[] => {
-    let shouldDropTempField = false;
-
     const linearizeExpression = (expression?: SelectClause.Expression): PipelineStage[] => {
         const stages: PipelineStage[] = [];
 
@@ -180,20 +178,17 @@ const generateAggregationStages = (clauses: Clauses): PipelineStage[] => {
         let pattern = expression.pattern;
 
         if (expression.fields.length > 1 || (expression.fields.length >= 1 && expression.functions.length >= 1)) {
-            if (expression.functions.length >= 1) {
-                stages.push({ fn: 'duplicate', arguments: { column: '_value', as: '__temp' } });
-                shouldDropTempField = true;
-            }
-
-            stages.push({
-                fn: 'pivot',
-                arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' },
-            });
+            if (!stages.some(stage => stage.fn === 'pivot'))
+                stages.push({
+                    fn: 'pivot',
+                    arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' },
+                });
 
             for (const field of expression.fields)
                 pattern = pattern.replace('$', field.startsWith('"') ? `r[${field}]` : `r.${field}`);
 
-            pattern = pattern.replaceAll('#', `r.__temp`);
+            // TODO: if more than one function, split the stream (aggregate each one with one of the functions)
+            //       and join after the aggregations
         }
 
         if (pattern !== '$' && pattern !== '#') {
@@ -212,12 +207,7 @@ const generateAggregationStages = (clauses: Clauses): PipelineStage[] => {
         return [];
 
 
-    const stages = linearizeExpression(clauses.select.expressions[0]);
-
-    if (shouldDropTempField)
-        stages.push({ fn: 'drop', arguments: { columns: '["__temp"]' } });
-
-    return stages;
+    return linearizeExpression(clauses.select.expressions[0]);
 };
 
 const splitAtFirstAggregationFunction = (stages: PipelineStage[]):

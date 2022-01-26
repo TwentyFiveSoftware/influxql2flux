@@ -571,10 +571,8 @@ test('percentile and percentage calculation', () => {
         { fn: 'filter', arguments: { fn: '(r) => r._field == "memory total" or r._field == "memory_usage"' } },
         { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r._value * 0.5 })' } },
         { fn: 'aggregateWindow', arguments: { every: '10s', fn: [{ fn: 'quantile', arguments: { q: '0.975' } }] } },
-        { fn: 'duplicate', arguments: { column: '_value', as: '__temp' } },
         { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
-        { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r.__temp * 100 / r["memory total"] })' } },
-        { fn: 'drop', arguments: { columns: '["__temp"]' } },
+        { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r._value * 100 / r["memory total"] })' } },
         { fn: 'group', arguments: { columns: '["host"]', mode: '"by"' } },
     ];
     expect(generatePipeline(clauses).stages).toEqual(stages);
@@ -621,12 +619,9 @@ test('math before first aggregation', () => {
         { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
         { fn: 'map', arguments: { fn: '(r) => ({ r with _value: (r.requests - 10) / 29 + (r["data center"] | 3) })' } },
         { fn: 'aggregateWindow', arguments: { every: '5.5h', fn: 'sum' } },
-        { fn: 'duplicate', arguments: { column: '_value', as: '__temp' } },
-        { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
-        { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r.__temp / 2 + (r.a ^ r.b) })' } },
+        { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r._value / 2 + (r.a ^ r.b) })' } },
         { fn: 'integral', arguments: { unit: '1.5m' } },
         { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r._value / 100 })' } },
-        { fn: 'drop', arguments: { columns: '["__temp"]' } },
         { fn: 'group', arguments: { columns: '["host"]', mode: '"by"' } },
     ];
     expect(generatePipeline(clauses).stages).toEqual(stages);
