@@ -1,27 +1,39 @@
 import type { Pipeline, PipelineStage } from './types';
 
 export const generateFlux = (pipelines: Pipeline[]): string => {
-    let flux = '';
+    const fluxPerPipeline: string[] = [];
 
-    if (pipelines.length === 0)
-        return '';
+    for (const pipeline of pipelines) {
+        const fluxLines: string[] = [];
 
-    const pipeline = pipelines[0];
+        for (const stage of pipeline.stages) {
+            let args = Object.keys(stage.arguments).map(key => {
+                let value = stage.arguments[key];
 
-    for (const stage of pipeline.stages) {
-        let args = Object.keys(stage.arguments).map(key => {
-            let value = stage.arguments[key];
+                if (Array.isArray(value))
+                    value = '(column, tables=<-) =>\n       tables |> '
+                        + generateFlux([{ stages: value as PipelineStage[] }]);
 
-            if (Array.isArray(value))
-                value = '(column, tables=<-) =>\n       tables |> '
-                    + generateFlux([{ stages: value as PipelineStage[] }]);
+                return `${key}: ${value}`;
+            }).join(', ');
 
-            return `${key}: ${value}`;
-        }).join(', ');
+            const fn = `${stage.fn}(${args})`;
+            fluxLines.push(fn);
+        }
 
-        const fn = `${stage.fn}(${args})`;
-        flux += flux === '' ? fn : `\n  |> ${fn}`;
+
+        let fluxStart = '';
+
+        if (pipeline.outputVariableName)
+            fluxStart += `${pipeline.outputVariableName} = `;
+
+        if (pipeline.inputVariableName) {
+            fluxStart += `${pipeline.inputVariableName}`;
+            fluxLines.unshift('');
+        }
+
+        fluxPerPipeline.push(fluxStart + fluxLines.join('\n  |> '));
     }
 
-    return flux;
+    return fluxPerPipeline.join('\n\n');
 };
