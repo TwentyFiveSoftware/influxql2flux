@@ -1,7 +1,12 @@
 import type { Pipeline, PipelineStage } from './types';
 
-export const generateFlux = (pipeline: Pipeline): string => {
+export const generateFlux = (pipelines: Pipeline[]): string => {
     let flux = '';
+
+    if (pipelines.length === 0)
+        return '';
+
+    const pipeline = pipelines[0];
 
     for (const stage of pipeline.stages) {
         let args = Object.keys(stage.arguments).map(key => {
@@ -9,7 +14,7 @@ export const generateFlux = (pipeline: Pipeline): string => {
 
             if (Array.isArray(value))
                 value = '(column, tables=<-) =>\n       tables |> '
-                    + generateFlux({ stages: value as PipelineStage[] });
+                    + generateFlux([{ stages: value as PipelineStage[] }]);
 
             return `${key}: ${value}`;
         }).join(', ');

@@ -3,36 +3,49 @@ import { Clauses, SelectClause, WhereClause, FillClause, FromClause, GroupByClau
 import { removeUnnecessaryOuterBrackets } from '../clauses/utility/removeUnnecessaryOuterBrackets';
 import { fluxFunctionLookupTable } from './fluxFunctionLookupTable';
 
-export const generatePipeline = (clauses: Clauses): Pipeline => {
+export const generatePipelines = (clauses: Clauses): Pipeline[] => {
+    if (!clauses.select || !clauses.from)
+        return [];
+
+    const pipelines: Pipeline[] = [];
+
     const pipeline: Pipeline = {
-        stages: [],
+        stages: [
+            ...generateFromStage(clauses.from),
+            ...generateRangeStage(clauses.where),
+            ...generateFilterStages(clauses),
+            ...generateGroupByStage(clauses.groupBy),
+        ],
     };
 
-    if (!clauses.select || !clauses.from)
-        return pipeline;
+    const aggregationStagesPerPipeline = generateAggregationStages(clauses).map(splitAtFirstAggregationFunction);
+
+    if (aggregationStagesPerPipeline.length === 0) {
+        pipeline.stages.push(...generateTimeAggregationStage(clauses.groupBy));
+        pipeline.stages.push(...generateFillStage(clauses.fill));
+
+    } else if (aggregationStagesPerPipeline.length === 1) {
+        const aggregationStages = aggregationStagesPerPipeline[0];
+
+        pipeline.stages.push(...aggregationStages.before);
+        pipeline.stages.push(...generateTimeAggregationStage(clauses.groupBy, aggregationStages.fn));
+
+        if (aggregationStages.fn?.fn)
+            pipeline.stages.push(aggregationStages.fn);
+
+        pipeline.stages.push(...aggregationStages.after);
+
+        pipeline.stages.push(...generateFillStage(clauses.fill));
+    }
+
+    pipelines.push(pipeline);
 
 
-    const aggregationStages = splitAtFirstAggregationFunction(generateAggregationStages(clauses));
+    pipelines.forEach(p => {
+        p.stages = p.stages.filter(stage => stage.fn.length > 0);
+    });
 
-    pipeline.stages.push(...generateFromStage(clauses.from));
-    pipeline.stages.push(...generateRangeStage(clauses.where));
-    pipeline.stages.push(...generateFilterStages(clauses));
-    pipeline.stages.push(...generateGroupByStage(clauses.groupBy));
-
-    pipeline.stages.push(...aggregationStages.before);
-    pipeline.stages.push(...generateTimeAggregationStage(clauses.groupBy, aggregationStages.fn));
-
-    if (aggregationStages.fn?.fn)
-        pipeline.stages.push(aggregationStages.fn);
-
-    pipeline.stages.push(...aggregationStages.after);
-
-    pipeline.stages.push(...generateFillStage(clauses.fill));
-
-
-    pipeline.stages = pipeline.stages.filter(stage => stage.fn.length > 0);
-
-    return pipeline;
+    return pipelines;
 };
 
 const generateFromStage = (fromClause?: FromClause.Clause): PipelineStage[] => {
@@ -163,7 +176,7 @@ const generateFillStage = (fillClause?: FillClause.Clause): PipelineStage[] => {
     }];
 };
 
-const generateAggregationStages = (clauses: Clauses): PipelineStage[] => {
+const generateAggregationStages = (clauses: Clauses): PipelineStage[][] => {
     const linearizeExpression = (expression?: SelectClause.Expression): PipelineStage[] => {
         const stages: PipelineStage[] = [];
 
@@ -206,11 +219,10 @@ const generateAggregationStages = (clauses: Clauses): PipelineStage[] => {
         return stages;
     };
 
-    if (!clauses.select || clauses.select.star || clauses.select.expressions.length !== 1)
+    if (!clauses.select || clauses.select.star)
         return [];
 
-
-    return linearizeExpression(clauses.select.expressions[0]);
+    return clauses.select.expressions.map(linearizeExpression);
 };
 
 const splitAtFirstAggregationFunction = (stages: PipelineStage[]):

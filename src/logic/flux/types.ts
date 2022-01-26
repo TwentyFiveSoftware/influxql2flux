@@ -1,5 +1,7 @@
 export interface Pipeline {
     stages: PipelineStage[];
+    outputVariableName?: string;
+    inputVariableName?: string;
 }
 
 export interface PipelineStage {

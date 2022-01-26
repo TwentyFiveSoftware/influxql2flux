@@ -1,6 +1,6 @@
 import { parseClauses } from './clauses/parseClauses';
 import { generateFlux } from './flux/generateFlux';
-import { generatePipeline } from './flux/generatePipeline';
+import { generatePipelines } from './flux/generatePipelines';
 
 export const transpile = (influxQL: string): string =>
-    generateFlux(generatePipeline(parseClauses(influxQL)));
+    generateFlux(generatePipelines(parseClauses(influxQL)));
