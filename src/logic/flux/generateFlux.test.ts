@@ -95,3 +95,19 @@ test('nested filter', () => {
         '  |> filter(fn: (r) => (r.a + 10) * 1.5 > 20 or ((r["b b"] == "$a" or r.c < 0) and r.d != "x"))';
     expect(generateFlux(pipeline)).toEqual(flux);
 });
+
+test('time aggregation function with arguments', () => {
+    const pipeline: Pipeline = {
+        stages: [
+            { fn: 'from', arguments: { bucket: '"system"' } },
+            { fn: 'range', arguments: { start: '-1mo', stop: 'now()' } },
+            { fn: 'aggregateWindow', arguments: { every: '10s', fn: [{ fn: 'quantile', arguments: { q: '0.975' } }] } },
+        ],
+    };
+
+    const flux =
+        'from(bucket: "system")\n' +
+        '  |> range(start: -1mo, stop: now())\n' +
+        '  |> aggregateWindow(every: 10s, fn: (column, tables=<-) =>\n       tables |> quantile(q: 0.975))';
+    expect(generateFlux(pipeline)).toEqual(flux);
+});
