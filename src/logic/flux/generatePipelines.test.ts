@@ -21,6 +21,7 @@ test('simple test', () => {
         stages: [
             { fn: 'from', arguments: { bucket: '"system"' } },
             { fn: 'filter', arguments: { fn: '(r) => r._field == "ram_usage"' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -32,7 +33,6 @@ test('basic filter test', () => {
             star: false,
             expressions: [
                 { pattern: '$', fields: ['cpu'], functions: [] },
-                { pattern: '$', fields: ['ram'], functions: [] },
             ],
         },
         from: { bucket: 'system', retention: 'autogen' },
@@ -50,9 +50,10 @@ test('basic filter test', () => {
     const pipelines: Pipeline[] = [{
         stages: [
             { fn: 'from', arguments: { bucket: '"system/autogen"' } },
-            { fn: 'filter', arguments: { fn: '(r) => r._field == "cpu" or r._field == "ram"' } },
+            { fn: 'filter', arguments: { fn: '(r) => r._field == "cpu"' } },
             { fn: 'filter', arguments: { fn: '(r) => r.host =~ /$host/' } },
             { fn: 'filter', arguments: { fn: '(r) => r["data center"] + r.nr != "m-1"' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -95,6 +96,7 @@ test('complex filter test', () => {
             { fn: 'filter', arguments: { fn: '(r) => r._field == "cpu"' } },
             { fn: 'filter', arguments: { fn: '(r) => r.a > -3.5' } },
             { fn: 'filter', arguments: { fn: '(r) => (r.b == 3 and r.c == "xxx") or (r.d - 5) * 3 < 100 or r.e != "frontend"' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -120,6 +122,7 @@ test('range (start only)', () => {
             { fn: 'range', arguments: { start: '-7d' } },
             { fn: 'filter', arguments: { fn: '(r) => r._measurement == "cpu"' } },
             { fn: 'filter', arguments: { fn: '(r) => r._field == "usage"' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -145,6 +148,7 @@ test('range (stop only)', () => {
             { fn: 'range', arguments: { stop: '2022-01-01T00:00:00Z' } },
             { fn: 'filter', arguments: { fn: '(r) => r._measurement == "cpu"' } },
             { fn: 'filter', arguments: { fn: '(r) => r._field == "usage"' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -176,6 +180,7 @@ test('range (nested time filter)', () => {
             { fn: 'range', arguments: { start: 'now()' } },
             { fn: 'filter', arguments: { fn: '(r) => r._field == "a"' } },
             { fn: 'filter', arguments: { fn: '(r) => r._time < 2022-01-01T00:00:00Z or r["a a a"] != 99' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -198,6 +203,7 @@ test('group by one column', () => {
         stages: [
             { fn: 'from', arguments: { bucket: '"b"' } },
             { fn: 'group', arguments: { columns: '["user agent"]', mode: '"by"' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value", "user agent"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -220,6 +226,7 @@ test('group by multiple columns', () => {
         stages: [
             { fn: 'from', arguments: { bucket: '"b"' } },
             { fn: 'group', arguments: { columns: '["user agent", "host"]', mode: '"by"' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value", "user agent", "host"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -252,6 +259,7 @@ test('group by one column and aggregate', () => {
             { fn: 'filter', arguments: { fn: '(r) => r._field == "requests"' } },
             { fn: 'group', arguments: { columns: '["instance"]', mode: '"by"' } },
             { fn: 'mean', arguments: {} },
+            { fn: 'keep', arguments: { columns: '["_time", "_value", "instance"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -275,6 +283,7 @@ test('group by time', () => {
         stages: [
             { fn: 'from', arguments: { bucket: '"b"' } },
             { fn: 'aggregateWindow', arguments: { every: '30s' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -308,6 +317,7 @@ test('where and group by time and columns', () => {
             { fn: 'filter', arguments: { fn: '(r) => r.host !~ /^eu-[0-9]+/' } },
             { fn: 'group', arguments: { columns: '["xxx", "host", "c"]', mode: '"by"' } },
             { fn: 'aggregateWindow', arguments: { every: '1mo' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value", "xxx", "host", "c"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -330,6 +340,7 @@ test('fill value', () => {
         stages: [
             { fn: 'from', arguments: { bucket: '"b"' } },
             { fn: 'fill', arguments: { value: '1.5' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -352,6 +363,7 @@ test('fill previous', () => {
         stages: [
             { fn: 'from', arguments: { bucket: '"b"' } },
             { fn: 'fill', arguments: { usePrevious: 'true' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -373,6 +385,7 @@ test('fill with no value', () => {
     const pipelines: Pipeline[] = [{
         stages: [
             { fn: 'from', arguments: { bucket: '"b"' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -407,6 +420,7 @@ test('group and fill', () => {
             { fn: 'filter', arguments: { fn: '(r) => r._field == "a"' } },
             { fn: 'group', arguments: { columns: '["host"]', mode: '"by"' } },
             { fn: 'fill', arguments: { value: '12' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value", "host"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -435,6 +449,7 @@ test('one aggregation function', () => {
             { fn: 'from', arguments: { bucket: '"system"' } },
             { fn: 'filter', arguments: { fn: '(r) => r._field == "requests"' } },
             { fn: 'top', arguments: { n: '20' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -467,6 +482,7 @@ test('one aggregation function with time grouping', () => {
             { fn: 'from', arguments: { bucket: '"b"' } },
             { fn: 'filter', arguments: { fn: '(r) => r._field == "response time"' } },
             { fn: 'aggregateWindow', arguments: { every: '30s', fn: 'mean' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -503,6 +519,7 @@ test('nested functions (no math)', () => {
             { fn: 'filter', arguments: { fn: '(r) => r._field == "cpu_usage"' } },
             { fn: 'distinct', arguments: {} },
             { fn: 'count', arguments: {} },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -546,6 +563,7 @@ test('nested aggregation functions with time aggregation', () => {
             { fn: 'group', arguments: { columns: '["host", "user_agent"]', mode: '"by"' } },
             { fn: 'aggregateWindow', arguments: { every: '10s', fn: 'last' } },
             { fn: 'derivative', arguments: { unit: '1s', nonNegative: 'true' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value", "host", "user_agent"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -569,6 +587,7 @@ test('one field with math', () => {
             { fn: 'from', arguments: { bucket: '"system"' } },
             { fn: 'filter', arguments: { fn: '(r) => r._field == "a"' } },
             { fn: 'map', arguments: { fn: '(r) => ({ r with _value: 5 - (r._value + 100) / 25.2 })' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -593,6 +612,7 @@ test('two fields with math', () => {
             { fn: 'filter', arguments: { fn: '(r) => r._field == "a" or r._field == "b"' } },
             { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
             { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r.a / r.b })' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -632,6 +652,7 @@ test('percentile and percentage calculation', () => {
             { fn: 'aggregateWindow', arguments: { every: '10s', fn: [{ fn: 'quantile', arguments: { q: '0.975' } }] } },
             { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
             { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r._value * 100 / r["memory total"] })' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value", "host"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -683,6 +704,7 @@ test('math before first aggregation', () => {
             { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r._value / 2 + (r.a ^ r.b) })' } },
             { fn: 'integral', arguments: { unit: '1.5m' } },
             { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r._value / 100 })' } },
+            { fn: 'keep', arguments: { columns: '["_time", "_value", "host"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
@@ -743,7 +765,7 @@ test('different aggregates for different fields', () => {
         },
         {
             stages: [
-                { fn: 'union', arguments: { tables: '["data_field_1", "data_field_2"]' } },
+                { fn: 'union', arguments: { tables: '[data_field_1, data_field_2]' } },
                 { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
                 { fn: 'keep', arguments: { columns: '["_time", "instance", "data_field_1", "data_field_2"]' } },
             ],

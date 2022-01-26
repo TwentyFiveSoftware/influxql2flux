@@ -18,27 +18,81 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
         ],
     };
 
+    const columnsToKeep: string[] = ['"_time"', '"_value"', ...(clauses.groupBy?.columns ?? [])];
+
     const aggregationStagesPerPipeline = generateAggregationStages(clauses).map(splitAtFirstAggregationFunction);
 
-    if (aggregationStagesPerPipeline.length === 0) {
-        pipeline.stages.push(...generateTimeAggregationStage(clauses.groupBy));
-        pipeline.stages.push(...generateFillStage(clauses.fill));
-
-    } else if (aggregationStagesPerPipeline.length === 1) {
+    if (aggregationStagesPerPipeline.length <= 1) {
         const aggregationStages = aggregationStagesPerPipeline[0];
 
-        pipeline.stages.push(...aggregationStages.before);
-        pipeline.stages.push(...generateTimeAggregationStage(clauses.groupBy, aggregationStages.fn));
+        if (aggregationStages)
+            pipeline.stages.push(...aggregationStages.before);
 
-        if (aggregationStages.fn?.fn)
+        pipeline.stages.push(...generateTimeAggregationStage(clauses.groupBy, aggregationStages?.fn));
+
+        if (aggregationStages?.fn?.fn)
             pipeline.stages.push(aggregationStages.fn);
 
-        pipeline.stages.push(...aggregationStages.after);
+        if (aggregationStages)
+            pipeline.stages.push(...aggregationStages.after);
 
         pipeline.stages.push(...generateFillStage(clauses.fill));
-    }
+        pipeline.stages.push({ fn: 'keep', arguments: { columns: `[${columnsToKeep.join(', ')}]` } });
+        pipelines.push(pipeline);
 
-    pipelines.push(pipeline);
+    } else {
+        pipeline.outputVariableName = 'data';
+        pipelines.push(pipeline);
+
+        const subPipelineVariableNames: string[] = [];
+
+        for (let i = 0; i < aggregationStagesPerPipeline.length; i++) {
+            const aggregationStages = aggregationStagesPerPipeline[i];
+
+            const outputVariableName = `data_field_${i + 1}`;
+            subPipelineVariableNames.push(outputVariableName);
+
+            const subPipeline: Pipeline = {
+                stages: [],
+                inputVariableName: 'data',
+                outputVariableName,
+            };
+
+            subPipeline.stages.push(...aggregationStages.before);
+            subPipeline.stages.push(...generateTimeAggregationStage(clauses.groupBy, aggregationStages.fn));
+
+            if (aggregationStages.fn?.fn)
+                subPipeline.stages.push(aggregationStages.fn);
+
+            subPipeline.stages.push(...aggregationStages.after);
+
+            subPipeline.stages.push(...generateFillStage(clauses.fill));
+            subPipeline.stages.push({ fn: 'set', arguments: { key: '"_field"', value: `"${outputVariableName}"` } });
+
+            pipelines.push(subPipeline);
+        }
+
+
+        pipelines.push({
+            stages: [
+                {
+                    fn: 'union',
+                    arguments: { tables: `[${subPipelineVariableNames.join(', ')}]` },
+                },
+                {
+                    fn: 'pivot',
+                    arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' },
+                },
+                {
+                    fn: 'keep',
+                    arguments: {
+                        columns: `[${[...columnsToKeep.filter(c => c !== '"_value"'),
+                            ...subPipelineVariableNames.map(c => `"${c}"`)].join(', ')}]`,
+                    },
+                },
+            ],
+        });
+    }
 
 
     pipelines.forEach(p => {
