@@ -187,32 +187,14 @@ test.each([
     expect(selectClause.expressions).toEqual(expressions);
 });
 
-test.each([
-    'log', 'moving_average', 'pow',
-])('advanced transform functions (%s)', (fn: string) => {
-    const selectClause = parseSelectClause(`${fn}("field", 5)`);
+test('advanced transform functions (moving_average)', () => {
+    const selectClause = parseSelectClause(`moving_average("field", 5)`);
     const expressions: SelectClause.Expression[] = [
         {
             pattern: '#', fields: [], functions: [{
-                fn: fn, arguments: [
+                fn: 'moving_average', arguments: [
                     { pattern: '$', fields: ['field'], functions: [] },
                     { pattern: '5', fields: [], functions: [] },
-                ],
-            }],
-        },
-    ];
-    expect(selectClause.star).toBe(false);
-    expect(selectClause.expressions).toEqual(expressions);
-});
-
-test('transform: atan2', () => {
-    const selectClause = parseSelectClause(`atan2("altitude", "distance")`);
-    const expressions: SelectClause.Expression[] = [
-        {
-            pattern: '#', fields: [], functions: [{
-                fn: 'atan2', arguments: [
-                    { pattern: '$', fields: ['altitude'], functions: [] },
-                    { pattern: '$', fields: ['distance'], functions: [] },
                 ],
             }],
         },
@@ -346,18 +328,56 @@ test('math: 5', () => {
     expect(selectClause.expressions).toEqual(expressions);
 });
 
-// NOT SUPPORTED!
-// test('count *', () => {
-//     const selectClause = transpileSelectClause(`count(*)`);
-//     const expressions: Expression[] = [
-//         {
-//             pattern: '#', fields: [], functions: [{
-//                 fn: 'count', arguments: [
-//                     { pattern: '*', fields: [], functions: [] },
-//                 ],
-//             }],
-//         },
-//     ];
-//     expect(selectClause.star).toBe(false);
-//     expect(selectClause.expressions).toEqual(expressions);
-// });
+test('nested function with parameter', () => {
+    const selectClause = parseSelectClause(
+        `mean(sum("memory") + percentile("x", 99))`);
+    const expressions: SelectClause.Expression[] = [
+        {
+            pattern: '#', fields: [], functions: [
+                {
+                    fn: 'mean',
+                    arguments: [
+                        {
+                            pattern: '# + #',
+                            fields: [],
+                            functions: [
+                                {
+                                    fn: 'sum',
+                                    arguments: [
+                                        {
+                                            pattern: '$',
+                                            fields: [
+                                                'memory',
+                                            ],
+                                            functions: [],
+                                        },
+                                    ],
+                                },
+                                {
+                                    fn: 'percentile',
+                                    arguments: [
+                                        {
+                                            pattern: '$',
+                                            fields: [
+                                                'x',
+                                            ],
+                                            functions: [],
+                                        },
+                                        {
+                                            pattern: '99',
+                                            fields: [],
+                                            functions: [],
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
+    ];
+    expect(selectClause.star).toBe(false);
+    expect(selectClause.expressions).toEqual(expressions);
+});
+

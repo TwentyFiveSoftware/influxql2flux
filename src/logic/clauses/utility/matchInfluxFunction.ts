@@ -1,4 +1,5 @@
 import { removeUnnecessaryOuterBrackets } from './removeUnnecessaryOuterBrackets';
+import { getMostOuterGroups } from './getMostOuterGroups';
 
 export interface InfluxFunction {
     fn: string;
@@ -37,10 +38,9 @@ export const matchInfluxFunctions = (influxQL: string): InfluxFunction[] => {
 
         const fn = influxQL.substring(fnStartIndex, fnEndIndex);
         const fnName = fn.split('(', 1)[0].trim().toLowerCase();
-        const fnArguments = removeUnnecessaryOuterBrackets(fn.substring(fn.indexOf('(') + 1).trim())
-            .split(',')
-            .map(a => removeUnnecessaryOuterBrackets(a))
-            .filter(a => a.length > 0);
+        const fnArguments =
+            getMostOuterGroups(removeUnnecessaryOuterBrackets(fn.substring(fn.indexOf('(') + 1).trim()), ',')
+                .map(a => removeUnnecessaryOuterBrackets(a)).filter(a => a.length > 0);
 
         functions.push({ fn: fnName, arguments: fnArguments, fromIndex: fnStartIndex, toIndex: fnEndIndex });
 

@@ -15,6 +15,7 @@ test.each([
         { fn: 'c', arguments: ['x'], fromIndex: 17, toIndex: 20 }]],
 
     ['a("xxx", b("c"))', [{ fn: 'a', arguments: ['"xxx"', 'b("c")'], fromIndex: 0, toIndex: 15 }]],
+    ['a("xxx", b("c", 99))', [{ fn: 'a', arguments: ['"xxx"', 'b("c", 99)'], fromIndex: 0, toIndex: 19 }]],
 
 ])('test', (influxQL: string, expected: InfluxFunction[]) => {
     expect(matchInfluxFunctions(influxQL)).toEqual(expected);
