@@ -25,6 +25,11 @@ const App = () => {
                         <SyntaxHighlighting code={flux} />
                     </div>
                 )}
+
+
+                <a className={styles.github} href={'https://github.com/TwentyFiveSoftware/influxql2flux'}>
+                    GitHub / TwentyFiveSoftware / influxql2flux
+                </a>
             </main>
         </div>
     );

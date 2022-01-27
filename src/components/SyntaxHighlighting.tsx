@@ -27,8 +27,11 @@ const SyntaxHighlighting = ({ code }: Props) => {
                 if (fn[1] !== 'fn')
                     tokens.push({ color: '#E06C75', text: fn[1] ?? '', index: fn.index ?? 0 });
 
-            for (const fn of line.matchAll(/.{2}\(([a-z_]+)\) *=>|.{3}([a-z_]+)[.[]|\({ ([a-z_]+)/gi))
-                tokens.push({ color: '#D19A66', text: fn[1] ?? fn[2] ?? fn[3] ?? '', index: (fn.index ?? -1) + 3 });
+            for (const fn of line.matchAll(/\(([a-z_]+)\) *=>|.([a-z_]+)[.[]/gi))
+                tokens.push({ color: '#D19A66', text: fn[1] ?? fn[2] ?? '', index: (fn.index ?? 0) + 1 });
+
+            for (const fn of line.matchAll(/\({ ([a-z_]+)/gi))
+                tokens.push({ color: '#D19A66', text: fn[1] ?? '', index: (fn.index ?? 0) + 3 });
 
             for (const fn of line.matchAll(/[^_](-?[0-9]+(?:\.[0-9]*)?(?:y|mo|w|d|h|m|s|ms|us|µs|ns)?)/gi))
                 tokens.push({ color: '#D19A66', text: fn[1] ?? '', index: (fn.index ?? 0) + 1 });

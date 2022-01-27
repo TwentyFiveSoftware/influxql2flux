@@ -39,7 +39,7 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
                 ...generateGroupByStage(clauses.groupBy),
                 ...aggregationPipelineStages,
                 ...generateFillStage(clauses.fill),
-                { fn: 'keep', arguments: { columns: `[${columnsToKeep.join(', ')}]` } },
+                ...(clauses.select.star ? [] : [{ fn: 'keep', arguments: { columns: `[${columnsToKeep.join(', ')}]` } }]),
             ],
         });
 

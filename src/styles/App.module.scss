@@ -55,3 +55,17 @@
     width: 100%;
     padding: 0.3rem;
 }
+
+.github {
+    color: var(--color-text-light);
+    text-align: center;
+    margin-top: 4rem;
+    font-size: 1.8rem;
+    cursor: pointer;
+    transition: color 0.2s;
+    font-family: 'JetBrains Mono', 'Rubik', sans-serif;
+
+    &:hover {
+        color: var(--color-text);
+    }
+}
