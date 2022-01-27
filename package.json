@@ -5,6 +5,7 @@
         "name": "TwentyFiveSoftware",
         "email": "twentyfivesoftware@gmail.com"
     },
+    "homepage": "https://influxql2flux.twentyfive.dev",
     "scripts": {
         "start": "react-scripts start",
         "build": "react-scripts build",
