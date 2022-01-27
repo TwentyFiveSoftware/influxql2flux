@@ -23,7 +23,7 @@ export const fluxFunctionLookupTable: FluxFunctionLookupTable = {
     min: { fluxFnName: 'min' },
     percentile: {
         fluxFnName: 'quantile',
-        argsMapping: (args) => ({ q: (Number(args[0] ?? '0') / 100).toString() }),
+        argsMapping: (args) => ({ q: (Math.floor((Number(args[0] ?? '0') / 100) * 10000) / 10000).toString() }),
     },
     sample: {
         fluxFnName: 'sample',

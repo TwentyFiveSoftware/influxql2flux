@@ -9,22 +9,13 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
 
     const pipelines: Pipeline[] = [];
 
-    // const pipeline: Pipeline = {
-    //     stages: [
-    //         ...generateFromStage(clauses.from),
-    //         ...generateRangeStage(clauses.where),
-    //         ...generateFilterStages(clauses),
-    //         ...generateGroupByStage(clauses.groupBy),
-    //     ],
-    // };
-
     const columnsToKeep: string[] = ['"_time"', '"_value"', ...(clauses.groupBy?.columns ?? [])];
 
-    const aggregationStagesPerPipeline = generateAggregationStages(clauses).map(splitAtFirstAggregationFunction);
+    const aggregationStagesPerSelectExpression = generateAggregationStages(clauses);
+    const aggregationStageSplits = aggregationStagesPerSelectExpression.flat().map(splitAtFirstAggregationFunction);
 
-    if (aggregationStagesPerPipeline.length <= 1) {
-
-        const aggregationStages = aggregationStagesPerPipeline[0];
+    if (aggregationStageSplits.length <= 1) {
+        const aggregationStages = aggregationStageSplits[0];
         const aggregationPipelineStages: PipelineStage[] = [];
 
         if (aggregationStages)
@@ -54,18 +45,12 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
 
 
     } else {
-        const requiredFieldsForEachExpression = clauses.select.expressions
-            .map(e => getRequiredFieldInExpressions([e]));
-        const globalRequiredFields = Array.from(new Set(requiredFieldsForEachExpression.flat()))
-            .filter(f => !requiredFieldsForEachExpression.some(e => !e.includes(f)));
-
-
         pipelines.push({
             outputVariableName: 'data',
             stages: [
                 ...generateFromStage(clauses.from),
                 ...generateRangeStage(clauses.where),
-                ...generateFilterStageFromFields(globalRequiredFields),
+                ...generateFilterStageFromFields(getRequiredFieldInExpressions(clauses.select.expressions)),
                 ...generateFilterStages(clauses),
                 ...generateGroupByStage(clauses.groupBy),
                 ...generateFillStage(clauses.fill),
@@ -73,24 +58,25 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
         });
 
 
+        const lastStageOfSelectExpressionIndices = aggregationStagesPerSelectExpression
+            .map((e) => e.length)
+            .map((e, i, a) => (a[i - 1] ?? 0) + e);
+
         const subPipelineVariableNames: string[] = [];
 
-        for (let i = 0; i < aggregationStagesPerPipeline.length; i++) {
-            const aggregationStages = aggregationStagesPerPipeline[i];
+        for (let i = 0; i < aggregationStageSplits.length; i++) {
+            const aggregationStages = aggregationStageSplits[i];
 
             const outputVariableName = `data_field_${i + 1}`;
-            subPipelineVariableNames.push(outputVariableName);
+            if (lastStageOfSelectExpressionIndices.includes(i + 1))
+                subPipelineVariableNames.push(outputVariableName);
 
-
-            let requiredFields = getRequiredFieldInExpressions([clauses.select.expressions[i]]);
-            requiredFields = requiredFields.filter(field => !globalRequiredFields.includes(field)).length === 0
-                ? [] : requiredFields;
+            const isFirstFnUnion = aggregationStages.before[0]?.fn === 'union';
 
             pipelines.push({
-                inputVariableName: 'data',
+                inputVariableName: isFirstFnUnion ? undefined : 'data',
                 outputVariableName,
                 stages: [
-                    ...generateFilterStageFromFields(requiredFields),
                     ...aggregationStages.before,
                     ...generateTimeAggregationStage(clauses.groupBy, aggregationStages.fn),
                     ...(aggregationStages.fn?.fn ? [aggregationStages.fn] : []),
@@ -100,26 +86,34 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
             });
         }
 
+        if (subPipelineVariableNames.length === 1) {
+            pipelines[pipelines.length - 1].outputVariableName = undefined;
+            pipelines[pipelines.length - 1].stages.pop();
+            pipelines[pipelines.length - 1].stages.push(
+                { fn: 'keep', arguments: { columns: `[${columnsToKeep.join(', ')}]` } },
+            );
 
-        pipelines.push({
-            stages: [
-                {
-                    fn: 'union',
-                    arguments: { tables: `[${subPipelineVariableNames.join(', ')}]` },
-                },
-                {
-                    fn: 'pivot',
-                    arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' },
-                },
-                {
-                    fn: 'keep',
-                    arguments: {
-                        columns: `[${[...columnsToKeep.filter(c => c !== '"_value"'),
-                            ...subPipelineVariableNames.map(c => `"${c}"`)].join(', ')}]`,
+        } else {
+            pipelines.push({
+                stages: [
+                    {
+                        fn: 'union',
+                        arguments: { tables: `[${subPipelineVariableNames.join(', ')}]` },
                     },
-                },
-            ],
-        });
+                    {
+                        fn: 'pivot',
+                        arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' },
+                    },
+                    {
+                        fn: 'keep',
+                        arguments: {
+                            columns: `[${[...columnsToKeep.filter(c => c !== '"_value"'),
+                                ...subPipelineVariableNames.map(c => `"${c}"`)].join(', ')}]`,
+                        },
+                    },
+                ],
+            });
+        }
     }
 
 
@@ -170,12 +164,6 @@ const getRequiredFieldInExpressions = (expressions: SelectClause.Expression[]): 
 };
 
 const generateFilterStageFromFields = (fields: string[]): PipelineStage[] => {
-    // if (!expression)
-    //     return [];
-    //
-    // const usedFields = getRequiredFieldInExpressions([expression])
-    //     .filter(field => !excludeFields.includes(field));
-
     if (fields.length === 0)
         return [];
 
@@ -270,51 +258,79 @@ const generateFillStage = (fillClause?: FillClause.Clause): PipelineStage[] => {
     }];
 };
 
-const generateAggregationStages = (clauses: Clauses): PipelineStage[][] => {
-    const linearizeExpression = (expression?: SelectClause.Expression): PipelineStage[] => {
-        const stages: PipelineStage[] = [];
+const generateAggregationStages = (clauses: Clauses): PipelineStage[][][] => {
+    const linearizeExpression = (expression: SelectClause.Expression): PipelineStage[][] => {
+        const pipelines: PipelineStage[][] = [];
 
-        if (!expression)
-            return stages;
+        for (const fn of expression.functions) {
+            pipelines.push(
+                ...fn.arguments
+                    .filter(a => a.functions.length > 0 || a.fields.length > 0)
+                    .map(linearizeExpression).flat(),
+            );
 
-        if (expression.functions.length > 0) {
-            const fn = expression.functions[0];
+            if (pipelines.length > 0)
+                pipelines[pipelines.length - 1].push(mapInfluxToFluxFunction(fn));
+            else
+                pipelines.push([mapInfluxToFluxFunction(fn)]);
+        }
 
-            stages.push(...linearizeExpression(fn.arguments.find(a => a.functions.length > 0 || a.fields.length > 0)));
+        let pipeline: PipelineStage[] = [];
 
-            stages.push(mapInfluxToFluxFunction(fn));
+        const requiredVariables = (new Array(expression.functions.length).fill(0))
+            .map((_, i) => `data_field_${pipelines.length - i}`).reverse();
+
+        if (requiredVariables.length === 1) {
+            pipeline.push(...(pipelines.pop() ?? []));
+            pipeline = pipeline.filter(stage => stage.fn !== 'filter');
+
+        } else if (requiredVariables.length >= 2) {
+            pipeline.push({ fn: 'union', arguments: { tables: `[${requiredVariables.join(', ')}]` } });
+        }
+
+        if (pipeline[0]?.fn !== 'union' && requiredFieldsInAllExpressions) {
+            const requiredFields = getRequiredFieldInExpressions([expression]);
+            if (requiredFields.length !== requiredFieldsInAllExpressions.length)
+                pipeline.unshift(...generateFilterStageFromFields(requiredFields));
         }
 
         let pattern = expression.pattern;
 
-        if (expression.fields.length > 1 || (expression.fields.length >= 1 && expression.functions.length >= 1)) {
-            if (!stages.some(stage => stage.fn === 'pivot'))
-                stages.push({
-                    fn: 'pivot',
-                    arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' },
-                });
-
+        if (expression.fields.length + expression.functions.length >= 2) {
             for (const field of expression.fields)
                 pattern = pattern.replace('$', field.startsWith('"') ? `r[${field}]` : `r.${field}`);
 
-            // TODO: if more than one function, split the stream (aggregate each one with one of the functions)
-            //       and join after the aggregations
+            if (expression.functions.length >= 2)
+                for (const variable of requiredVariables)
+                    pattern = pattern.replace('#', `r.${variable}`);
+
+            if (!pipeline.some(stage => stage.fn === 'pivot'))
+                pipeline.push({
+                    fn: 'pivot',
+                    arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' },
+                });
         }
 
         if (pattern !== '$' && pattern !== '#') {
             pattern = pattern.replace(/[$#]/g, 'r._value');
 
-            stages.push({
+            pipeline.push({
                 fn: 'map',
                 arguments: { fn: `(r) => ({ r with _value: ${pattern} })` },
             });
         }
 
-        return stages;
+        if (pipeline.length > 0)
+            pipelines.push(pipeline);
+
+        return pipelines;
     };
+
 
     if (!clauses.select || clauses.select.star)
         return [];
+
+    const requiredFieldsInAllExpressions = getRequiredFieldInExpressions(clauses.select.expressions);
 
     return clauses.select.expressions.map(linearizeExpression);
 };
@@ -322,10 +338,10 @@ const generateAggregationStages = (clauses: Clauses): PipelineStage[][] => {
 const splitAtFirstAggregationFunction = (stages: PipelineStage[]):
     { before: PipelineStage[], fn?: PipelineStage, after: PipelineStage[] } => {
 
-    const index = stages.findIndex(stage => stage.fn !== 'map' && stage.fn !== 'pivot');
+    const index = stages.findIndex(stage => Object.values(fluxFunctionLookupTable).map(f => f.fluxFnName).includes(stage.fn));
 
     if (index === -1)
-        return { before: [], after: stages };
+        return { before: stages, after: [] };
 
     return { before: stages.slice(0, index), fn: stages[index], after: stages.slice(index + 1) };
 };

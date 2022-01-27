@@ -807,14 +807,13 @@ test('different aggregates for different fields', () => {
         {
             stages: [
                 { fn: 'from', arguments: { bucket: '"system"' } },
-                { fn: 'filter', arguments: { fn: '(r) => r._field == "b"' } },
+                { fn: 'filter', arguments: { fn: '(r) => r._field == "a" or r._field == "b"' } },
                 { fn: 'group', arguments: { columns: '["instance"]', mode: '"by"' } },
             ],
             outputVariableName: 'data',
         },
         {
             stages: [
-                { fn: 'filter', arguments: { fn: '(r) => r._field == "a" or r._field == "b"' } },
                 { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
                 { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r.a + r.b })' } },
                 { fn: 'mean', arguments: {} },
@@ -825,6 +824,7 @@ test('different aggregates for different fields', () => {
         },
         {
             stages: [
+                { fn: 'filter', arguments: { fn: '(r) => r._field == "b"' } },
                 { fn: 'max', arguments: {} },
                 { fn: 'set', arguments: { key: '"_field"', value: '"data_field_2"' } },
             ],
@@ -836,6 +836,183 @@ test('different aggregates for different fields', () => {
                 { fn: 'union', arguments: { tables: '[data_field_1, data_field_2]' } },
                 { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
                 { fn: 'keep', arguments: { columns: '["_time", "instance", "data_field_1", "data_field_2"]' } },
+            ],
+        },
+    ];
+
+    expect(generatePipelines(clauses)).toEqual(pipeline);
+});
+
+test('different aggregates for different fields in one expression', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [
+                {
+                    pattern: '# * 100 / #', fields: [], functions: [
+                        {
+                            fn: 'mean', arguments: [
+                                { pattern: '$ + $', fields: ['memory_swap', 'memory_used'], functions: [] },
+                            ],
+                        },
+                        {
+                            fn: 'last', arguments: [
+                                { pattern: '$', fields: ['memory_total'], functions: [] },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
+        from: { bucket: 'system' },
+        groupBy: {
+            star: false,
+            columns: ['"instance"'],
+        },
+    };
+
+    const pipeline: Pipeline[] = [
+        {
+            stages: [
+                { fn: 'from', arguments: { bucket: '"system"' } },
+                { fn: 'filter', arguments: { fn: '(r) => r._field == "memory_swap" or r._field == "memory_used" or r._field == "memory_total"' } },
+                { fn: 'group', arguments: { columns: '["instance"]', mode: '"by"' } },
+            ],
+            outputVariableName: 'data',
+        },
+        {
+            stages: [
+                { fn: 'filter', arguments: { fn: '(r) => r._field == "memory_swap" or r._field == "memory_used"' } },
+                { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
+                { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r.memory_swap + r.memory_used })' } },
+                { fn: 'mean', arguments: {} },
+                { fn: 'set', arguments: { key: '"_field"', value: '"data_field_1"' } },
+            ],
+            outputVariableName: 'data_field_1',
+            inputVariableName: 'data',
+        },
+        {
+            stages: [
+                { fn: 'filter', arguments: { fn: '(r) => r._field == "memory_total"' } },
+                { fn: 'last', arguments: {} },
+                { fn: 'set', arguments: { key: '"_field"', value: '"data_field_2"' } },
+            ],
+            outputVariableName: 'data_field_2',
+            inputVariableName: 'data',
+        },
+        {
+            stages: [
+                { fn: 'union', arguments: { tables: '[data_field_1, data_field_2]' } },
+                { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
+                { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r.data_field_1 * 100 / r.data_field_2 })' } },
+                { fn: 'keep', arguments: { columns: '["_time", "_value", "instance"]' } },
+            ],
+        },
+    ];
+
+    expect(generatePipelines(clauses)).toEqual(pipeline);
+});
+
+test('different nested aggregates for different fields in one expression', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [
+                {
+                    pattern: '# * 100 / #', fields: [], functions: [
+                        {
+                            fn: 'mean', arguments: [
+                                {
+                                    pattern: '(3 + #) / #', fields: [], functions: [
+                                        {
+                                            fn: 'distinct', arguments: [
+                                                {
+                                                    pattern: '1 / ($ + $)', fields: ['a', 'b'], functions: [],
+                                                },
+                                            ],
+                                        },
+                                        {
+                                            fn: 'count', arguments: [
+                                                {
+                                                    pattern: '$', fields: ['a'], functions: [],
+                                                },
+                                            ],
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                        {
+                            fn: 'derivative', arguments: [
+                                { pattern: '$', fields: ['d'], functions: [] },
+                                { pattern: '1s', fields: [], functions: [] },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
+        from: { bucket: 'system' },
+        groupBy: {
+            star: false,
+            columns: ['"instance"'],
+        },
+    };
+
+    const pipeline: Pipeline[] = [
+        {
+            stages: [
+                { fn: 'from', arguments: { bucket: '"system"' } },
+                { fn: 'filter', arguments: { fn: '(r) => r._field == "a" or r._field == "b" or r._field == "d"' } },
+                { fn: 'group', arguments: { columns: '["instance"]', mode: '"by"' } },
+            ],
+            outputVariableName: 'data',
+        },
+        {
+            stages: [
+                { fn: 'filter', arguments: { fn: '(r) => r._field == "a" or r._field == "b"' } },
+                { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
+                { fn: 'map', arguments: { fn: '(r) => ({ r with _value: 1 / (r.a + r.b) })' } },
+                { fn: 'distinct', arguments: {} },
+                { fn: 'set', arguments: { key: '"_field"', value: '"data_field_1"' } },
+            ],
+            outputVariableName: 'data_field_1',
+            inputVariableName: 'data',
+        },
+        {
+            stages: [
+                { fn: 'filter', arguments: { fn: '(r) => r._field == "a"' } },
+                { fn: 'count', arguments: {} },
+                { fn: 'set', arguments: { key: '"_field"', value: '"data_field_2"' } },
+            ],
+            outputVariableName: 'data_field_2',
+            inputVariableName: 'data',
+        },
+        {
+            stages: [
+                { fn: 'union', arguments: { tables: '[data_field_1, data_field_2]' } },
+                { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
+                { fn: 'map', arguments: { fn: '(r) => ({ r with _value: (3 + r.data_field_1) / r.data_field_2 })' } },
+                { fn: 'mean', arguments: {} },
+                { fn: 'set', arguments: { key: '"_field"', value: '"data_field_3"' } },
+            ],
+            outputVariableName: 'data_field_3',
+        },
+        {
+            stages: [
+                { fn: 'filter', arguments: { fn: '(r) => r._field == "d"' } },
+                { fn: 'derivative', arguments: { unit: '1s', nonNegative: 'false' } },
+                { fn: 'set', arguments: { key: '"_field"', value: '"data_field_4"' } },
+            ],
+            outputVariableName: 'data_field_4',
+            inputVariableName: 'data',
+        },
+        {
+            stages: [
+                { fn: 'union', arguments: { tables: '[data_field_3, data_field_4]' } },
+                { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
+                { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r.data_field_3 * 100 / r.data_field_4 })' } },
+                { fn: 'keep', arguments: { columns: '["_time", "_value", "instance"]' } },
             ],
         },
     ];
