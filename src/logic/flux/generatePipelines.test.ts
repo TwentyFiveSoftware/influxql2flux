@@ -120,8 +120,8 @@ test('range (start only)', () => {
         stages: [
             { fn: 'from', arguments: { bucket: '"system"' } },
             { fn: 'range', arguments: { start: '-7d' } },
-            { fn: 'filter', arguments: { fn: '(r) => r._measurement == "cpu"' } },
             { fn: 'filter', arguments: { fn: '(r) => r._field == "usage"' } },
+            { fn: 'filter', arguments: { fn: '(r) => r._measurement == "cpu"' } },
             { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
@@ -146,8 +146,8 @@ test('range (stop only)', () => {
         stages: [
             { fn: 'from', arguments: { bucket: '"system"' } },
             { fn: 'range', arguments: { stop: '2022-01-01T00:00:00Z' } },
-            { fn: 'filter', arguments: { fn: '(r) => r._measurement == "cpu"' } },
             { fn: 'filter', arguments: { fn: '(r) => r._field == "usage"' } },
+            { fn: 'filter', arguments: { fn: '(r) => r._measurement == "cpu"' } },
             { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
@@ -710,7 +710,7 @@ test('math before first aggregation', () => {
     expect(generatePipelines(clauses)).toEqual(pipelines);
 });
 
-test('different aggregates for different fields', () => {
+test('different aggregates for same field', () => {
     const clauses: Clauses = {
         select: {
             star: false,
@@ -749,6 +749,74 @@ test('different aggregates for different fields', () => {
         },
         {
             stages: [
+                { fn: 'mean', arguments: {} },
+                { fn: 'set', arguments: { key: '"_field"', value: '"data_field_1"' } },
+            ],
+            outputVariableName: 'data_field_1',
+            inputVariableName: 'data',
+        },
+        {
+            stages: [
+                { fn: 'max', arguments: {} },
+                { fn: 'set', arguments: { key: '"_field"', value: '"data_field_2"' } },
+            ],
+            outputVariableName: 'data_field_2',
+            inputVariableName: 'data',
+        },
+        {
+            stages: [
+                { fn: 'union', arguments: { tables: '[data_field_1, data_field_2]' } },
+                { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
+                { fn: 'keep', arguments: { columns: '["_time", "instance", "data_field_1", "data_field_2"]' } },
+            ],
+        },
+    ];
+
+    expect(generatePipelines(clauses)).toEqual(pipeline);
+});
+
+test('different aggregates for different fields', () => {
+    const clauses: Clauses = {
+        select: {
+            star: false,
+            expressions: [
+                {
+                    pattern: '#', fields: [], functions: [{
+                        fn: 'mean', arguments: [
+                            { pattern: '$ + $', fields: ['a', 'b'], functions: [] },
+                        ],
+                    }],
+                },
+                {
+                    pattern: '#', fields: [], functions: [{
+                        fn: 'max', arguments: [
+                            { pattern: '$', fields: ['b'], functions: [] },
+                        ],
+                    }],
+                },
+            ],
+        },
+        from: { bucket: 'system' },
+        groupBy: {
+            star: false,
+            columns: ['"instance"'],
+        },
+    };
+
+    const pipeline: Pipeline[] = [
+        {
+            stages: [
+                { fn: 'from', arguments: { bucket: '"system"' } },
+                { fn: 'filter', arguments: { fn: '(r) => r._field == "b"' } },
+                { fn: 'group', arguments: { columns: '["instance"]', mode: '"by"' } },
+            ],
+            outputVariableName: 'data',
+        },
+        {
+            stages: [
+                { fn: 'filter', arguments: { fn: '(r) => r._field == "a" or r._field == "b"' } },
+                { fn: 'pivot', arguments: { rowKey: '["_time"]', columnKey: '["_field"]', valueColumn: '"_value"' } },
+                { fn: 'map', arguments: { fn: '(r) => ({ r with _value: r.a + r.b })' } },
                 { fn: 'mean', arguments: {} },
                 { fn: 'set', arguments: { key: '"_field"', value: '"data_field_1"' } },
             ],

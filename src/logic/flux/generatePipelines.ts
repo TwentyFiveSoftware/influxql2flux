@@ -9,40 +9,69 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
 
     const pipelines: Pipeline[] = [];
 
-    const pipeline: Pipeline = {
-        stages: [
-            ...generateFromStage(clauses.from),
-            ...generateRangeStage(clauses.where),
-            ...generateFilterStages(clauses),
-            ...generateGroupByStage(clauses.groupBy),
-        ],
-    };
+    // const pipeline: Pipeline = {
+    //     stages: [
+    //         ...generateFromStage(clauses.from),
+    //         ...generateRangeStage(clauses.where),
+    //         ...generateFilterStages(clauses),
+    //         ...generateGroupByStage(clauses.groupBy),
+    //     ],
+    // };
 
     const columnsToKeep: string[] = ['"_time"', '"_value"', ...(clauses.groupBy?.columns ?? [])];
 
     const aggregationStagesPerPipeline = generateAggregationStages(clauses).map(splitAtFirstAggregationFunction);
 
     if (aggregationStagesPerPipeline.length <= 1) {
+
         const aggregationStages = aggregationStagesPerPipeline[0];
+        const aggregationPipelineStages: PipelineStage[] = [];
 
         if (aggregationStages)
-            pipeline.stages.push(...aggregationStages.before);
+            aggregationPipelineStages.push(...aggregationStages.before);
 
-        pipeline.stages.push(...generateTimeAggregationStage(clauses.groupBy, aggregationStages?.fn));
+        aggregationPipelineStages.push(...generateTimeAggregationStage(clauses.groupBy, aggregationStages?.fn));
 
         if (aggregationStages?.fn?.fn)
-            pipeline.stages.push(aggregationStages.fn);
+            aggregationPipelineStages.push(aggregationStages.fn);
 
         if (aggregationStages)
-            pipeline.stages.push(...aggregationStages.after);
+            aggregationPipelineStages.push(...aggregationStages.after);
 
-        pipeline.stages.push(...generateFillStage(clauses.fill));
-        pipeline.stages.push({ fn: 'keep', arguments: { columns: `[${columnsToKeep.join(', ')}]` } });
-        pipelines.push(pipeline);
+
+        pipelines.push({
+            stages: [
+                ...generateFromStage(clauses.from),
+                ...generateRangeStage(clauses.where),
+                ...generateFilterStageFromFields(getRequiredFieldInExpressions(clauses.select.expressions)),
+                ...generateFilterStages(clauses),
+                ...generateGroupByStage(clauses.groupBy),
+                ...aggregationPipelineStages,
+                ...generateFillStage(clauses.fill),
+                { fn: 'keep', arguments: { columns: `[${columnsToKeep.join(', ')}]` } },
+            ],
+        });
+
 
     } else {
-        pipeline.outputVariableName = 'data';
-        pipelines.push(pipeline);
+        const requiredFieldsForEachExpression = clauses.select.expressions
+            .map(e => getRequiredFieldInExpressions([e]));
+        const globalRequiredFields = Array.from(new Set(requiredFieldsForEachExpression.flat()))
+            .filter(f => !requiredFieldsForEachExpression.some(e => !e.includes(f)));
+
+
+        pipelines.push({
+            outputVariableName: 'data',
+            stages: [
+                ...generateFromStage(clauses.from),
+                ...generateRangeStage(clauses.where),
+                ...generateFilterStageFromFields(globalRequiredFields),
+                ...generateFilterStages(clauses),
+                ...generateGroupByStage(clauses.groupBy),
+                ...generateFillStage(clauses.fill),
+            ],
+        });
+
 
         const subPipelineVariableNames: string[] = [];
 
@@ -52,24 +81,23 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
             const outputVariableName = `data_field_${i + 1}`;
             subPipelineVariableNames.push(outputVariableName);
 
-            const subPipeline: Pipeline = {
-                stages: [],
+
+            let requiredFields = getRequiredFieldInExpressions([clauses.select.expressions[i]]);
+            requiredFields = requiredFields.filter(field => !globalRequiredFields.includes(field)).length === 0
+                ? [] : requiredFields;
+
+            pipelines.push({
                 inputVariableName: 'data',
                 outputVariableName,
-            };
-
-            subPipeline.stages.push(...aggregationStages.before);
-            subPipeline.stages.push(...generateTimeAggregationStage(clauses.groupBy, aggregationStages.fn));
-
-            if (aggregationStages.fn?.fn)
-                subPipeline.stages.push(aggregationStages.fn);
-
-            subPipeline.stages.push(...aggregationStages.after);
-
-            subPipeline.stages.push(...generateFillStage(clauses.fill));
-            subPipeline.stages.push({ fn: 'set', arguments: { key: '"_field"', value: `"${outputVariableName}"` } });
-
-            pipelines.push(subPipeline);
+                stages: [
+                    ...generateFilterStageFromFields(requiredFields),
+                    ...aggregationStages.before,
+                    ...generateTimeAggregationStage(clauses.groupBy, aggregationStages.fn),
+                    ...(aggregationStages.fn?.fn ? [aggregationStages.fn] : []),
+                    ...aggregationStages.after,
+                    { fn: 'set', arguments: { key: '"_field"', value: `"${outputVariableName}"` } },
+                ],
+            });
         }
 
 
@@ -128,20 +156,39 @@ const generateRangeStage = (whereClause?: WhereClause.Clause): PipelineStage[] =
     return [rangeStage];
 };
 
+const getRequiredFieldInExpressions = (expressions: SelectClause.Expression[]): string[] => {
+    const fields: string[] = [];
+
+    for (const expression of expressions.filter(e => e)) {
+        fields.push(...expression.fields);
+
+        for (const fn of expression.functions)
+            fields.push(...getRequiredFieldInExpressions(fn.arguments));
+    }
+
+    return Array.from(new Set(fields));
+};
+
+const generateFilterStageFromFields = (fields: string[]): PipelineStage[] => {
+    // if (!expression)
+    //     return [];
+    //
+    // const usedFields = getRequiredFieldInExpressions([expression])
+    //     .filter(field => !excludeFields.includes(field));
+
+    if (fields.length === 0)
+        return [];
+
+    return [{
+        fn: 'filter',
+        arguments: {
+            fn: '(r) => ' + fields.map(field =>
+                `r._field == ${field.startsWith('"') ? field : `"${field}"`}`).join(' or '),
+        },
+    }];
+};
+
 const generateFilterStages = (clauses: Clauses): PipelineStage[] => {
-    const getUsedFields = (expressions: SelectClause.Expression[]): string[] => {
-        const fields: string[] = [];
-
-        for (const expression of expressions) {
-            fields.push(...expression.fields);
-
-            for (const fn of expression.functions)
-                fields.push(...getUsedFields(fn.arguments));
-        }
-
-        return Array.from(new Set(fields));
-    };
-
     const generateFilterStage = (variable: WhereClause.Condition | WhereClause.Filter): string => {
         const generateFilterFunction = (variable: WhereClause.Condition | WhereClause.Filter): string => {
             if ('type' in variable)
@@ -163,13 +210,6 @@ const generateFilterStages = (clauses: Clauses): PipelineStage[] => {
 
     if (clauses.from?.measurement)
         filterStages.push(`(r) => r._measurement == "${clauses.from.measurement}"`);
-
-    if (clauses.select) {
-        const usedFields: string[] = clauses.select.star ? [] : getUsedFields(clauses.select.expressions);
-        if (usedFields.length > 0)
-            filterStages.push('(r) => ' + usedFields.map(field =>
-                `r._field == ${field.startsWith('"') ? field : `"${field}"`}`).join(' or '));
-    }
 
     if (clauses.where && clauses.where.filters) {
         if ('type' in clauses.where.filters && clauses.where.filters.type === 'and') {
