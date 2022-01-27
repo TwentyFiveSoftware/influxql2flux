@@ -30,14 +30,14 @@ const SyntaxHighlighting = ({ code }: Props) => {
             for (const fn of line.matchAll(/.{2}\(([a-z_]+)\) *=>|.{3}([a-z_]+)[.[]|\({ ([a-z_]+)/gi))
                 tokens.push({ color: '#D19A66', text: fn[1] ?? fn[2] ?? fn[3] ?? '', index: (fn.index ?? -1) + 3 });
 
-            for (const fn of line.matchAll(/ (-?[0-9]+(?:\.[0-9]*)?(?:y|mo|w|d|h|m|s|ms|us|µs|ns)?) /gi))
+            for (const fn of line.matchAll(/[^_](-?[0-9]+(?:\.[0-9]*)?(?:y|mo|w|d|h|m|s|ms|us|µs|ns)?)/gi))
                 tokens.push({ color: '#D19A66', text: fn[1] ?? '', index: (fn.index ?? 0) + 1 });
 
             // "T, Z, :" in timestamps (2022-01-01T00:00:00Z)
             for (const fn of line.matchAll(/[0-9]{2}(T)|[0-9]{2}(Z)|[0-9]{2}(:)/gi))
                 tokens.push({ color: '#D19A66', text: fn[1] ?? fn[2] ?? fn[3] ?? '', index: (fn.index ?? 0) + 2 });
 
-            for (const fn of line.matchAll(/(==|>=|<=|=~|!~|!=|and|or|true|false|with)/gi))
+            for (const fn of line.matchAll(/(==|>=|<=|=~|!~|!=| and | or | true | false | with )/gi))
                 tokens.push({ color: '#C678DD', text: fn[1] ?? '', index: fn.index ?? 0 });
 
             for (const fn of line.matchAll(/ (>) | (<) | ([+*\\|%^&-]) /gi))

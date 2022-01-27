@@ -58,9 +58,8 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
         });
 
 
-        const lastStageOfSelectExpressionIndices = aggregationStagesPerSelectExpression
-            .map((e) => e.length)
-            .map((e, i, a) => (a[i - 1] ?? 0) + e);
+        const lastStageOfSelectExpressionIndices = aggregationStagesPerSelectExpression.map((e) => e.length)
+            .map((e, i, a) => a.slice(0, i + 1).reduce((sum, c) => sum + c, 0));
 
         const subPipelineVariableNames: string[] = [];
 
@@ -279,7 +278,7 @@ const generateAggregationStages = (clauses: Clauses): PipelineStage[][][] => {
         let pipeline: PipelineStage[] = [];
 
         const requiredVariables = (new Array(expression.functions.length).fill(0))
-            .map((_, i) => `data_field_${pipelines.length - i}`).reverse();
+            .map((_, i) => `data_field_${pipelines.length - i + currentVariableIndexOffset}`).reverse();
 
         if (requiredVariables.length === 1) {
             pipeline.push(...(pipelines.pop() ?? []));
@@ -333,7 +332,12 @@ const generateAggregationStages = (clauses: Clauses): PipelineStage[][][] => {
 
     const requiredFieldsInAllExpressions = getRequiredFieldInExpressions(clauses.select.expressions);
 
-    return clauses.select.expressions.map(linearizeExpression);
+    let currentVariableIndexOffset = 0;
+    return clauses.select.expressions.map((e) => {
+        const exp = linearizeExpression(e);
+        currentVariableIndexOffset += exp.length;
+        return exp;
+    });
 };
 
 const splitAtFirstAggregationFunction = (stages: PipelineStage[]):
