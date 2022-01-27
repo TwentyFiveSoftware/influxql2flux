@@ -269,7 +269,15 @@ test('group by time', () => {
     const clauses: Clauses = {
         select: {
             star: false,
-            expressions: [],
+            expressions: [
+                {
+                    pattern: '#', fields: [], functions: [{
+                        fn: 'mean', arguments: [
+                            { pattern: '$', fields: ['a'], functions: [] },
+                        ],
+                    }],
+                },
+            ],
         },
         from: { bucket: 'b' },
         groupBy: {
@@ -282,14 +290,15 @@ test('group by time', () => {
     const pipelines: Pipeline[] = [{
         stages: [
             { fn: 'from', arguments: { bucket: '"b"' } },
-            { fn: 'aggregateWindow', arguments: { every: '30s' } },
+            { fn: 'filter', arguments: { fn: '(r) => r._field == "a"' } },
+            { fn: 'aggregateWindow', arguments: { every: '30s', fn: 'mean' } },
             { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
         ],
     }];
     expect(generatePipelines(clauses)).toEqual(pipelines);
 });
 
-test('where and group by time and columns', () => {
+test('where and group by time and columns (no time aggregation should show up)', () => {
     const clauses: Clauses = {
         select: {
             star: false,
@@ -316,7 +325,6 @@ test('where and group by time and columns', () => {
             { fn: 'filter', arguments: { fn: '(r) => r._field == "a"' } },
             { fn: 'filter', arguments: { fn: '(r) => r.host !~ /^eu-[0-9]+/' } },
             { fn: 'group', arguments: { columns: '["xxx", "host", "c"]', mode: '"by"' } },
-            { fn: 'aggregateWindow', arguments: { every: '1mo' } },
             { fn: 'keep', arguments: { columns: '["_time", "_value", "xxx", "host", "c"]' } },
         ],
     }];

@@ -241,9 +241,10 @@ const generateTimeAggregationStage = (groupByClause?: GroupByClause.Clause,
         aggregationFunction.fn = '';
     }
 
-    return fn
-        ? [{ fn: 'aggregateWindow', arguments: { every: groupByClause.timeInterval, fn } }]
-        : [{ fn: 'aggregateWindow', arguments: { every: groupByClause.timeInterval } }];
+    if (fn)
+        return [{ fn: 'aggregateWindow', arguments: { every: groupByClause.timeInterval, fn } }];
+
+    return [];
 };
 
 const generateFillStage = (fillClause?: FillClause.Clause): PipelineStage[] => {
