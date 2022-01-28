@@ -33,7 +33,7 @@ const SyntaxHighlighting = ({ code }: Props) => {
             for (const fn of line.matchAll(/\({ ([a-z_]+)/gi))
                 tokens.push({ color: '#D19A66', text: fn[1] ?? '', index: (fn.index ?? 0) + 3 });
 
-            for (const fn of line.matchAll(/[^_](-?[0-9]+(?:\.[0-9]*)?(?:y|mo|w|d|h|m|s|ms|us|µs|ns)?)/gi))
+            for (const fn of line.matchAll(/[^0-9_](-?[0-9]+(?:\.[0-9]*)?(?:y|mo|w|d|h|m|s|ms|us|µs|ns)?)/gi))
                 tokens.push({ color: '#D19A66', text: fn[1] ?? '', index: (fn.index ?? 0) + 1 });
 
             // "T, Z, :" in timestamps (2022-01-01T00:00:00Z)
