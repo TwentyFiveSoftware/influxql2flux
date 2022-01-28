@@ -22,7 +22,9 @@ export const parseSelectClause = (influxQL: string): SelectClause.Clause => {
 };
 
 const parse = (influxQL: string): SelectClause.Expression => {
-    const { functions, fnPattern } = parseFunctions(influxQL);
+    const split = getMostOuterGroups(influxQL, ' as ');
+
+    const { functions, fnPattern } = parseFunctions(split[0] ?? influxQL);
     const expression = parseExpression(fnPattern);
 
     return { pattern: expression.pattern, fields: expression.fields, functions };
