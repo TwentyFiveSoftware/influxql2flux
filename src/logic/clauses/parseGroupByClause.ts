@@ -29,7 +29,7 @@ export const parseGroupByClause = (influxQL: string): GroupByClause.Clause => {
         if (!(fn.fn === 'time' && fn.arguments.length > 0))
             continue;
 
-        if (fn.arguments[0].toLowerCase() === '$interval') {
+        if (['$interval', '$__interval'].includes(fn.arguments[0].toLowerCase())) {
             groupByClause.timeInterval = 'v.windowPeriod';
 
         } else {

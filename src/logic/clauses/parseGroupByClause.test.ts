@@ -70,6 +70,13 @@ test('time ($interval)', () => {
     expect(groupByClause.timeInterval).toEqual(`v.windowPeriod`);
 });
 
+test('time ($__interval)', () => {
+    const groupByClause = parseGroupByClause(`"host", time(2s), time($__interval)`);
+    expect(groupByClause.columns).toEqual(['"host"']);
+    expect(groupByClause.star).toBe(false);
+    expect(groupByClause.timeInterval).toEqual(`v.windowPeriod`);
+});
+
 test('time and columns', () => {
     const groupByClause = parseGroupByClause(`'user', time(12.3mo), "host"`);
     expect(groupByClause.columns).toEqual(['"user"', '"host"']);
