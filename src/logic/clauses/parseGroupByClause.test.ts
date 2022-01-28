@@ -60,7 +60,14 @@ test('time 3', () => {
     const groupByClause = parseGroupByClause(`time()`);
     expect(groupByClause.columns).toEqual([]);
     expect(groupByClause.star).toBe(false);
-    expect(groupByClause.timeInterval).toEqual(``);
+    expect(groupByClause.timeInterval).toBeUndefined();
+});
+
+test('time ($interval)', () => {
+    const groupByClause = parseGroupByClause(`time($interval)`);
+    expect(groupByClause.columns).toEqual([]);
+    expect(groupByClause.star).toBe(false);
+    expect(groupByClause.timeInterval).toEqual(`v.windowPeriod`);
 });
 
 test('time and columns', () => {
