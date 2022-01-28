@@ -41,6 +41,7 @@
     font-family: 'JetBrains Mono', 'Rubik', sans-serif;
     line-height: 1.2;
     font-variant-ligatures: no-contextual;
+    min-height: 8.2rem !important;
 
     &:focus {
         outline: 0.3rem solid var(--color-accent);
