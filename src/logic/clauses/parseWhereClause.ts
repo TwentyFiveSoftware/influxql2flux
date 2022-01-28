@@ -32,7 +32,16 @@ const parse = (influxQL: string): WhereClause.Filters => {
     return parseFilter(influxQL);
 };
 
-const parseFilter = (influxQL: string): WhereClause.Filter => {
+const parseFilter = (influxQL: string): WhereClause.Filters => {
+    if (influxQL === '$timeFilter') {
+        return {
+            type: 'and', variables: [
+                { fields: ['_time'], operator: '>=', value: 'v.timeRangeStart' } as WhereClause.Filter,
+                { fields: ['_time'], operator: '<=', value: 'v.timeRangeStop' } as WhereClause.Filter,
+            ],
+        };
+    }
+
     const { fields, fieldsPattern } = formatFields(influxQL);
     const operator = formatOperator(influxQL);
     const value = formatValue(influxQL, operator);

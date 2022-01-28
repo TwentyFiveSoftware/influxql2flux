@@ -308,3 +308,12 @@ test('time filters 3', () => {
         { fields: ['_time'], operator: '>=', value: 'now()' },
     ]);
 });
+
+test('$timeFilter variable', () => {
+    const whereClause = parseWhereClause(`$timeFilter`);
+    expect(whereClause.filters).toBeUndefined();
+    expect(whereClause.timeFilters).toEqual([
+        { fields: ['_time'], operator: '>=', value: 'v.timeRangeStart' },
+        { fields: ['_time'], operator: '<=', value: 'v.timeRangeStop' },
+    ]);
+});
