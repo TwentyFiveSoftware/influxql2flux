@@ -9,7 +9,7 @@ const SyntaxHighlighting = ({ code }: Props) => {
     const lines = code.split('\n')
         .map(line => {
             if (line.trim().length === 0)
-                return [{text: ' ', color: ''}];
+                return [{ text: ' ', color: '' }];
 
 
             let tokens: { color: string, text: string, index: number }[] = [];
@@ -40,11 +40,14 @@ const SyntaxHighlighting = ({ code }: Props) => {
             for (const fn of line.matchAll(/[0-9]{2}(T)|[0-9]{2}(Z)|[0-9]{2}(:)/gi))
                 tokens.push({ color: '#D19A66', text: fn[1] ?? fn[2] ?? fn[3] ?? '', index: (fn.index ?? 0) + 2 });
 
-            for (const fn of line.matchAll(/(==|>=|<=|=~|!~|!=| and | or | true | false | with )/gi))
+            for (const fn of line.matchAll(/(==|>=|<=|=~|!~|!=| and | or | with )/gi))
                 tokens.push({ color: '#C678DD', text: fn[1] ?? '', index: fn.index ?? 0 });
 
-            for (const fn of line.matchAll(/ (>) | (<) | ([+*\\|%^&-]) /gi))
-                tokens.push({ color: '#C678DD', text: fn[1] ?? fn[2] ?? fn[3] ?? '', index: (fn.index ?? 0) + 1 });
+            for (const fn of line.matchAll(/ (>) | (<) | ([+*\\|%^&-]) | (true)[ )]| (false)[ )]/gi))
+                tokens.push({
+                    color: '#C678DD', text: fn[1] ?? fn[2] ?? fn[3] ?? fn[4] ?? fn[5] ?? '',
+                    index: (fn.index ?? 0) + 1,
+                });
 
 
             // remove "double colored" tokens (e.g "true" and true)
