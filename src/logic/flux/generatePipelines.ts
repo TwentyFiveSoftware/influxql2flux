@@ -40,6 +40,7 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
                 ...aggregationPipelineStages,
                 ...generateFillStage(clauses.fill),
                 ...(clauses.select.star ? [] : [{ fn: 'keep', arguments: { columns: `[${columnsToKeep.join(', ')}]` } }]),
+                { fn: 'sort', arguments: { columns: `["_time"]` } },
             ],
         });
 
@@ -88,9 +89,10 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
         if (subPipelineVariableNames.length === 1) {
             pipelines[pipelines.length - 1].outputVariableName = undefined;
             pipelines[pipelines.length - 1].stages.pop();
-            pipelines[pipelines.length - 1].stages.push(
+            pipelines[pipelines.length - 1].stages.push(...[
                 { fn: 'keep', arguments: { columns: `[${columnsToKeep.join(', ')}]` } },
-            );
+                { fn: 'sort', arguments: { columns: `["_time"]` } },
+            ]);
 
         } else {
             pipelines.push({
@@ -110,6 +112,7 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
                                 ...subPipelineVariableNames.map(c => `"${c}"`)].join(', ')}]`,
                         },
                     },
+                    { fn: 'sort', arguments: { columns: `["_time"]` } },
                 ],
             });
         }
