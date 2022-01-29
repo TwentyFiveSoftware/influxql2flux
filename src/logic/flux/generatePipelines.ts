@@ -244,7 +244,7 @@ const generateTimeAggregationStage = (groupByClause?: GroupByClause.Clause,
     }
 
     if (fn)
-        return [{ fn: 'aggregateWindow', arguments: { every: groupByClause.timeInterval, fn } }];
+        return [{ fn: 'aggregateWindow', arguments: { every: groupByClause.timeInterval, fn, createEmpty: 'false' } }];
 
     return [];
 };
