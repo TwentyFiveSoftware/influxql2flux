@@ -11,7 +11,9 @@ const App: React.FC = () => {
 
     useEffect(() => setFlux(transpile(influxQL)), [influxQL]);
 
-    useEffect(() => setInfluxQL(Base64.decode(new URLSearchParams(window.location.search).get('q') ?? '')), []);
+    useEffect(() => {
+        setInfluxQL(Base64.decode(new URLSearchParams(window.location.search).get('q') ?? ''));
+    }, []);
 
     const onInfluxQLChange = (value: string) => {
         setInfluxQL(value);
@@ -24,8 +26,14 @@ const App: React.FC = () => {
                 <h1 className={styles.headline}>InfluxQL to Flux transpiler</h1>
 
                 <div className={styles.inputContainer}>
-                    <TextareaAutosize className={styles.input} rows={1} placeholder={'Type your InfluxQL query here'}
-                                      value={influxQL} onChange={e => onInfluxQLChange(e.target.value)} spellCheck={false} />
+                    <TextareaAutosize
+                        className={styles.input}
+                        rows={1}
+                        placeholder={'Type your InfluxQL query here'}
+                        value={influxQL}
+                        onChange={e => onInfluxQLChange(e.target.value)}
+                        spellCheck={false}
+                    />
                 </div>
 
                 {flux.length > 0 && (
