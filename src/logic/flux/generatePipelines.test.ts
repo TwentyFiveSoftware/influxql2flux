@@ -123,8 +123,8 @@ test('range (start only)', () => {
         stages: [
             { fn: 'from', arguments: { bucket: '"system"' } },
             { fn: 'range', arguments: { start: '-7d' } },
-            { fn: 'filter', arguments: { fn: '(r) => r._field == "usage"' } },
             { fn: 'filter', arguments: { fn: '(r) => r._measurement == "cpu"' } },
+            { fn: 'filter', arguments: { fn: '(r) => r._field == "usage"' } },
             { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
             { fn: 'sort', arguments: { columns: '["_time"]' } },
         ],
@@ -150,8 +150,8 @@ test('range (stop only)', () => {
         stages: [
             { fn: 'from', arguments: { bucket: '"system"' } },
             { fn: 'range', arguments: { stop: '2022-01-01T00:00:00Z' } },
-            { fn: 'filter', arguments: { fn: '(r) => r._field == "usage"' } },
             { fn: 'filter', arguments: { fn: '(r) => r._measurement == "cpu"' } },
+            { fn: 'filter', arguments: { fn: '(r) => r._field == "usage"' } },
             { fn: 'keep', arguments: { columns: '["_time", "_value"]' } },
             { fn: 'sort', arguments: { columns: '["_time"]' } },
         ],

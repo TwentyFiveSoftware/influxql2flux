@@ -1,17 +1,10 @@
 import { parseFromClause } from './parseFromClause';
 
-test('database only', () => {
-    const fromClause = parseFromClause(`"system"`);
-    expect(fromClause.bucket).toBe(`system`);
+test('measurement only', () => {
+    const fromClause = parseFromClause(`"cpu"`);
+    expect(fromClause.bucket).toBeUndefined();
     expect(fromClause.retention).toBeUndefined();
-    expect(fromClause.measurement).toBeUndefined();
-});
-
-test('database and retention', () => {
-    const fromClause = parseFromClause(`"system"."autogen"`);
-    expect(fromClause.bucket).toBe(`system`);
-    expect(fromClause.retention).toBe(`autogen`);
-    expect(fromClause.measurement).toBeUndefined();
+    expect(fromClause.measurement).toBe(`cpu`);
 });
 
 test('database, retention and measurement', () => {
@@ -30,16 +23,16 @@ test('database and measurement', () => {
 
 test('nothing', () => {
     const fromClause = parseFromClause(``);
-    expect(fromClause.bucket).toBe(``);
+    expect(fromClause.bucket).toBeUndefined();
     expect(fromClause.retention).toBeUndefined();
     expect(fromClause.measurement).toBeUndefined();
 });
 
-test('no quotes tolerance (database only)', () => {
-    const fromClause = parseFromClause(`frontend`);
-    expect(fromClause.bucket).toBe(`frontend`);
+test('no quotes tolerance (measurement)', () => {
+    const fromClause = parseFromClause(`memory_usage`);
+    expect(fromClause.bucket).toBeUndefined();
     expect(fromClause.retention).toBeUndefined();
-    expect(fromClause.measurement).toBeUndefined();
+    expect(fromClause.measurement).toBe(`memory_usage`);
 });
 
 test('no quotes tolerance (database, retention and measurement)', () => {
@@ -56,38 +49,23 @@ test('mixed quotes', () => {
     expect(fromClause.measurement).toBe(`response time`);
 });
 
-test('invalid (no database)', () => {
-    const fromClause = parseFromClause(`."autogen"`);
-    expect(fromClause.bucket).toBe(``);
-    expect(fromClause.retention).toBeUndefined();
-    expect(fromClause.measurement).toBeUndefined();
-});
-
 test('invalid', () => {
-    const fromClause = parseFromClause(`'a'."b"."c"."d"`);
-    expect(fromClause.bucket).toBe(``);
-    expect(fromClause.retention).toBeUndefined();
-    expect(fromClause.measurement).toBeUndefined();
-});
+    const invalidClauses = [
+        `."autogen"`,
+        `'a'."b"."c"."d"`,
+        `"abc"(xx)`,
+        `"xxx`,
+        `xx."a."x"`,
+        `xx."a."x"`,
+        `system..`,
+        `system...x`,
+        `..x`,
+    ];
 
-test('invalid', () => {
-    const fromClause = parseFromClause(`"abc"(xx)`);
-    expect(fromClause.bucket).toBe(``);
-    expect(fromClause.retention).toBeUndefined();
-    expect(fromClause.measurement).toBeUndefined();
-});
-
-test('invalid', () => {
-    const fromClause = parseFromClause(`"xxx`);
-    expect(fromClause.bucket).toBe(``);
-    expect(fromClause.retention).toBeUndefined();
-    expect(fromClause.measurement).toBeUndefined();
-});
-
-
-test('invalid', () => {
-    const fromClause = parseFromClause(`xx."a."x"`);
-    expect(fromClause.bucket).toBe(``);
-    expect(fromClause.retention).toBeUndefined();
-    expect(fromClause.measurement).toBeUndefined();
+    for (const invalidClause of invalidClauses) {
+        const fromClause = parseFromClause(invalidClause);
+        expect(fromClause.bucket).toBeUndefined();
+        expect(fromClause.retention).toBeUndefined();
+        expect(fromClause.measurement).toBeUndefined();
+    }
 });

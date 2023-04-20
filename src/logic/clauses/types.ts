@@ -26,7 +26,7 @@ export namespace SelectClause {
 
 export namespace FromClause {
     export interface Clause {
-        bucket: string;
+        bucket?: string;
         retention?: string;
         measurement?: string;
     }
@@ -39,7 +39,7 @@ export namespace WhereClause {
     }
 
     export interface Condition {
-        type: 'and' | 'or',
+        type: 'and' | 'or';
         variables: (Condition | Filter)[];
     }
 

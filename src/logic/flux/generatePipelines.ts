@@ -34,6 +34,7 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
             stages: [
                 ...generateFromStage(clauses.from),
                 ...generateRangeStage(clauses.where),
+                ...generateMeasurementFilter(clauses.from),
                 ...generateFilterStageFromFields(getRequiredFieldInExpressions(clauses.select.expressions)),
                 ...generateFilterStages(clauses),
                 ...generateGroupByStage(clauses.groupBy),
@@ -51,6 +52,7 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
             stages: [
                 ...generateFromStage(clauses.from),
                 ...generateRangeStage(clauses.where),
+                ...generateMeasurementFilter(clauses.from),
                 ...generateFilterStageFromFields(getRequiredFieldInExpressions(clauses.select.expressions)),
                 ...generateFilterStages(clauses),
                 ...generateGroupByStage(clauses.groupBy),
@@ -127,8 +129,9 @@ export const generatePipelines = (clauses: Clauses): Pipeline[] => {
 };
 
 const generateFromStage = (fromClause?: FromClause.Clause): PipelineStage[] => {
-    if (!fromClause)
-        return [];
+    if (!fromClause || !fromClause.bucket) {
+        return [{ fn: 'from', arguments: { bucket: '"<bucket_name>"' } }];
+    }
 
     const bucket = `"${fromClause.bucket}${fromClause.retention ? `/${fromClause.retention}` : ''}"`;
     return [{ fn: 'from', arguments: { bucket } }];
@@ -165,6 +168,14 @@ const getRequiredFieldInExpressions = (expressions: SelectClause.Expression[]): 
     return Array.from(new Set(fields));
 };
 
+const generateMeasurementFilter = (fromClause?: FromClause.Clause): PipelineStage[] => {
+    if (!fromClause || !fromClause.measurement) {
+        return [];
+    }
+
+    return [{ fn: 'filter', arguments: { fn: `(r) => r._measurement == "${fromClause.measurement}"` } }];
+};
+
 const generateFilterStageFromFields = (fields: string[]): PipelineStage[] => {
     if (fields.length === 0)
         return [];
@@ -197,9 +208,6 @@ const generateFilterStages = (clauses: Clauses): PipelineStage[] => {
 
 
     const filterStages: string[] = [];
-
-    if (clauses.from?.measurement)
-        filterStages.push(`(r) => r._measurement == "${clauses.from.measurement}"`);
 
     if (clauses.where && clauses.where.filters) {
         if ('type' in clauses.where.filters && clauses.where.filters.type === 'and') {

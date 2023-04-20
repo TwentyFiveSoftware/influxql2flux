@@ -9,15 +9,15 @@ test('select, from', () => {
     const clauses = parseClauses(`SELECT "cpu_Usage" from "system"`);
     expect(clauses).toEqual({
         select: { star: false, expressions: [{ pattern: '$', fields: ['cpu_Usage'], functions: [] }] },
-        from: { bucket: 'system' },
+        from: { measurement: 'system' },
     });
 });
 
 test('select, from (math)', () => {
-    const clauses = parseClauses(`select "a" * "b" from "c"."d"`);
+    const clauses = parseClauses(`select "a" * "b" from "c".."d"`);
     expect(clauses).toEqual({
         select: { star: false, expressions: [{ pattern: '$ * $', fields: ['a', 'b'], functions: [] }] },
-        from: { bucket: 'c', retention: 'd' },
+        from: { bucket: 'c', measurement: 'd' },
     });
 });
 
@@ -55,7 +55,7 @@ test('select, from, where', () => {
 });
 
 test('select, from, where (math)', () => {
-    const clauses = parseClauses(`select "used" * 100 / "total" from 'system'
+    const clauses = parseClauses(`select "used" * 100 / "total" from 'system'.'short_term'.'sys_stats'
         where "type" = "memory" and ('host name' =~ /$host/ or region <> 'eu') and (("used" / "total")) > 0.3`);
 
     expect(clauses).toEqual({
@@ -65,7 +65,7 @@ test('select, from, where (math)', () => {
                 pattern: '$ * 100 / $', fields: ['used', 'total'], functions: [],
             }],
         },
-        from: { bucket: 'system' },
+        from: { bucket: 'system', retention: 'short_term', measurement: 'sys_stats' },
         where: {
             filters: {
                 type: 'and',
@@ -104,7 +104,7 @@ test('select, from, where, group', () => {
                 ],
             }],
         },
-        from: { bucket: 'requests' },
+        from: { measurement: 'requests' },
         where: {
             filters: { fields: ['status_code'], operator: '>', value: '200' },
             timeFilters: [],
@@ -133,7 +133,7 @@ test('select, from, group', () => {
                 ],
             }],
         },
-        from: { bucket: 'tours' },
+        from: { measurement: 'tours' },
         groupBy: {
             star: false,
             columns: [],
@@ -150,7 +150,7 @@ test('select, from, fill', () => {
             star: false,
             expressions: [{ pattern: '$', fields: ['a'], functions: [] }],
         },
-        from: { bucket: 'b' },
+        from: { measurement: 'b' },
         fill: {
             usePrevious: true,
             value: '',
@@ -167,7 +167,7 @@ test('select, from, where, group, fill', () => {
             star: false,
             expressions: [{ pattern: '$', fields: ['" group by "'], functions: [] }],
         },
-        from: { bucket: 'fill' },
+        from: { measurement: 'fill' },
         where: {
             filters: { fields: ['from'], operator: '>', value: '1' },
             timeFilters: [],
@@ -223,7 +223,7 @@ test('select, from, where, fill', () => {
                 { pattern: '$', fields: ['b'], functions: [] },
             ],
         },
-        from: { bucket: 'c' },
+        from: { measurement: 'c' },
         where: {
             filters: { fields: ['d'], operator: '!~', value: '/xxx/' },
             timeFilters: [],
@@ -243,7 +243,7 @@ test('autocorrect select', () => {
             expressions: [],
         },
         from: {
-            bucket: 'x',
+            measurement: 'x',
         },
     });
 });
