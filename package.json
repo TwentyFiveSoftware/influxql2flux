@@ -2,7 +2,7 @@
     "name": "influxql2flux",
     "version": "1.1.0",
     "author": "TwentyFiveSoftware",
-    "homepage": "https://influxql2flux.twentyfive.dev",
+    "homepage": "https://twentyfivesoftware.github.io/influxql2flux",
     "repository": "https://github.com/TwentyFiveSoftware/influxql2flux",
     "scripts": {
         "dev": "vite",
